@@ -15,9 +15,11 @@ import { BetControls } from '@/components/game/BetControls'
 import { SettlementScreen } from '@/components/settlement/SettlementScreen'
 import { startRound, deal, nextRound } from '@/actions/game-actions'
 import { takeSeat, buyIn, closeRoom } from '@/actions/room-actions'
-import { computeSettlement } from '@/actions/settlement-actions'
+import { HostSettlementPanel } from '@/components/game/HostSettlementPanel'
+import { FloatingSuits } from '@/components/effects/FloatingSuits'
 import { formatChips } from '@/lib/utils'
 import type { Card, Rank, Suit } from '@/lib/blackjack'
+import type { SeatRow } from '@/lib/supabase/types'
 
 export function TableClient({ roomId, meId }: { roomId: string; meId: string }) {
   useRoomRealtime(roomId, meId)
@@ -75,6 +77,9 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
 
       {/* Felt table */}
       <div className="felt-table relative mx-auto mt-2 min-h-[60vh] max-w-5xl overflow-hidden rounded-[2.5rem] border-4 border-gold/20 p-4 sm:p-8">
+        <FloatingSuits />
+        {/* Dealer spotlight */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-48 [background:radial-gradient(50%_100%_at_50%_0%,color-mix(in_oklch,var(--gold)_12%,transparent),transparent)]" />
         <div className="relative z-10 flex flex-col items-center gap-8">
           <DealerArea dealerHand={dealerHand} phase={round?.phase ?? null} />
 
@@ -129,6 +134,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
       {isHost && (
         <HostDock
           roomId={roomId}
+          seats={playerSeats}
           status={room?.status ?? 'lobby'}
           phase={round?.phase ?? null}
           hasBets={hands.some((h) => !h.is_dealer && h.bet_amount > 0)}
@@ -236,16 +242,19 @@ function BuyInButton({ seatId, stack }: { seatId: string; stack: number }) {
 
 function HostDock({
   roomId,
+  seats,
   status,
   phase,
   hasBets,
 }: {
   roomId: string
+  seats: SeatRow[]
   status: string
   phase: string | null
   hasBets: boolean
 }) {
   const [pending, setPending] = useState<string | null>(null)
+  const [panelOpen, setPanelOpen] = useState(false)
   const run = async (key: string, fn: () => Promise<unknown>) => {
     setPending(key)
     try {
@@ -276,14 +285,13 @@ function HostDock({
             딜 시작
           </Button>
         )}
-        <Button
-          variant="danger"
-          disabled={pending !== null}
-          onClick={() => run('settle', () => computeSettlement(roomId))}
-        >
-          정산하고 종료
+        <Button variant="secondary" disabled={pending !== null} onClick={() => setPanelOpen(true)}>
+          정산 / 재배분
         </Button>
       </div>
+      {panelOpen && (
+        <HostSettlementPanel roomId={roomId} seats={seats} onClose={() => setPanelOpen(false)} />
+      )}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { SignInButton } from '@/components/lobby/SignInButton'
 import { CreateRoomForm } from '@/components/lobby/CreateRoomForm'
 import { JoinRoomForm } from '@/components/lobby/JoinRoomForm'
 import { Button } from '@/components/ui/button'
+import { FloatingSuits } from '@/components/effects/FloatingSuits'
 
 export default async function Home() {
   const user = await getUser()
@@ -14,8 +15,9 @@ export default async function Home() {
 
   return (
     <main className="relative min-h-dvh overflow-hidden">
-      {/* Ambient glow */}
+      {/* Ambient glow + drifting suits */}
       <div className="pointer-events-none absolute inset-0 [background:radial-gradient(60%_50%_at_50%_-10%,color-mix(in_oklch,var(--accent)_22%,transparent),transparent)]" />
+      <FloatingSuits />
 
       <div className="relative mx-auto flex max-w-5xl flex-col items-center gap-8 px-4 py-12 sm:py-16">
         <div className="space-y-3 text-center">

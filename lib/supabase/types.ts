@@ -31,6 +31,7 @@ export type LedgerType =
   | 'insurance'
   | 'insurance_payout'
   | 'refund'
+  | 'adjustment'
 
 export type RoomRow = {
   id: string

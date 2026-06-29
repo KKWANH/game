@@ -31,7 +31,14 @@ export function PlayingCard({ rank, suit, faceDown, index = 0, size = 'md' }: Pl
           <div className="absolute inset-1 rounded-md border border-gold/30 [background:repeating-linear-gradient(45deg,transparent,transparent_4px,color-mix(in_oklch,var(--gold)_25%,transparent)_4px,color-mix(in_oklch,var(--gold)_25%,transparent)_6px)]" />
         </div>
       ) : (
-        <div className="absolute inset-0 rounded-lg border border-black/10 bg-gradient-to-br from-white to-neutral-100 text-neutral-900 shadow-md">
+        <div className="absolute inset-0 overflow-hidden rounded-lg border border-black/10 bg-gradient-to-br from-white to-neutral-100 text-neutral-900 shadow-md">
+          <motion.div
+            className="pointer-events-none absolute inset-0 -skew-x-12"
+            style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent)' }}
+            initial={{ x: '-150%' }}
+            animate={{ x: '150%' }}
+            transition={{ delay: index * 0.08 + 0.2, duration: 0.5, ease: 'easeOut' }}
+          />
           <div className={cn('absolute top-1 left-1.5 font-bold leading-none', red && 'text-rose-600')}>
             <div>{rank}</div>
             <div className="text-xs">{suit ? SUIT_GLYPH[suit] : ''}</div>

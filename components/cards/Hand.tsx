@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { PlayingCard } from './PlayingCard'
+import { WinBurst } from '@/components/effects/WinBurst'
 import { handTotal, type Card, type Rank, type Suit } from '@/lib/blackjack'
 import { cn } from '@/lib/utils'
 import type { HandWithCards } from '@/store/room-store'
@@ -39,14 +40,23 @@ export function HandView({
   const badge = hand.outcome
     ? OUTCOME_LABEL[hand.outcome]
     : STATUS_LABEL[hand.status]
+  const won = hand.outcome === 'win' || hand.outcome === 'blackjack'
+  const lost = hand.outcome === 'lose' || hand.status === 'busted'
 
   return (
-    <div
+    <motion.div
+      animate={
+        won
+          ? { boxShadow: '0 0 0 2px var(--gold), 0 0 28px 4px color-mix(in oklch, var(--gold) 45%, transparent)' }
+          : { boxShadow: '0 0 0 0px transparent' }
+      }
       className={cn(
         'relative flex flex-col items-center gap-1 rounded-2xl p-2 transition-all',
-        isActive && 'glow-gold ring-2 ring-gold'
+        isActive && 'glow-gold ring-2 ring-gold',
+        lost && 'opacity-70'
       )}
     >
+      {won && <WinBurst big={hand.outcome === 'blackjack'} />}
       <div className="flex -space-x-5 sm:-space-x-6">
         <AnimatePresence>
           {hand.cards.map((c, i) => (
@@ -64,7 +74,7 @@ export function HandView({
           )}
         >
           {total.best}
-          {total.isSoft && !total.isBust ? ' soft' : ''}
+          {total.isSoft && total.best < 21 ? ' soft' : ''}
         </span>
       )}
 
@@ -84,6 +94,6 @@ export function HandView({
           {badge}
         </motion.span>
       )}
-    </div>
+    </motion.div>
   )
 }
