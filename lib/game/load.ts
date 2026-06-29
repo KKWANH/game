@@ -24,8 +24,9 @@ export async function loadRoundState(
       service.from('room_config').select('*').eq('room_id', round.room_id).single(),
       service.from('seats').select('*').eq('room_id', round.room_id),
       service.from('hands').select('*').eq('round_id', roundId),
-      // private schema — service-role only.
-      service.schema('private').from('round_secrets').select('*').eq('round_id', roundId).single(),
+      // Secret shoe via a service-role-only SECURITY DEFINER RPC (private schema
+      // is not exposed to PostgREST).
+      service.rpc('get_round_secret', { p_round_id: roundId }),
     ])
 
   if (!room || !config || !seats || !hands) throw new Error('failed to load round state')

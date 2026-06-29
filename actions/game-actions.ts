@@ -59,12 +59,9 @@ export async function startRound(roomId: string) {
     .single()
   if (error || !round) throw new Error('라운드 생성 실패: ' + error?.message)
 
-  // Shuffle a fresh shoe (server-only).
+  // Shuffle a fresh shoe (server-only) and stash it via the definer RPC.
   const shoe = freshShoe(config.num_decks)
-  await service
-    .schema('private')
-    .from('round_secrets')
-    .insert({ round_id: round.id, deck: shoe, deck_cursor: 0, dealer_hole_card: null })
+  await service.rpc('create_round_secret', { p_round_id: round.id, p_deck: shoe })
 
   await service
     .from('rooms')
@@ -164,11 +161,7 @@ export async function deal(roundId: string) {
   ]
 
   // Stash the secret hole card before committing public state.
-  await service
-    .schema('private')
-    .from('round_secrets')
-    .update({ dealer_hole_card: holeCard })
-    .eq('round_id', roundId)
+  await service.rpc('set_dealer_hole_card', { p_round_id: roundId, p_card: holeCard })
 
   await commitRound(service, roundId, state.round.version, patch)
 

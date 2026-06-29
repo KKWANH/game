@@ -189,6 +189,16 @@ export type Database = {
         Returns: { version: number }
       }
       is_room_member: { Args: { p_room_id: string }; Returns: boolean }
+      create_round_secret: { Args: { p_round_id: string; p_deck: unknown }; Returns: undefined }
+      get_round_secret: {
+        Args: { p_round_id: string }
+        Returns: {
+          deck: { rank: string; suit: string }[]
+          deck_cursor: number
+          dealer_hole_card: { rank: string; suit: string } | null
+        } | null
+      }
+      set_dealer_hole_card: { Args: { p_round_id: string; p_card: unknown }; Returns: undefined }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
