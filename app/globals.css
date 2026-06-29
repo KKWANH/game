@@ -1,0 +1,185 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* =====================================================================
+ * game.kwanho.dev — Blackjack table palette
+ * Dark-first casino theme: deep felt green, gold accents, neon glow.
+ * ===================================================================== */
+
+:root {
+  --background: oklch(0.18 0.03 160);
+  --foreground: oklch(0.97 0.01 150);
+  --card: oklch(0.22 0.035 162);
+  --card-foreground: oklch(0.97 0.01 150);
+  --popover: oklch(0.2 0.03 162);
+  --popover-foreground: oklch(0.97 0.01 150);
+  --primary: oklch(0.82 0.16 85); /* gold */
+  --primary-foreground: oklch(0.2 0.04 80);
+  --secondary: oklch(0.3 0.04 162);
+  --secondary-foreground: oklch(0.97 0.01 150);
+  --muted: oklch(0.28 0.03 162);
+  --muted-foreground: oklch(0.72 0.02 150);
+  --accent: oklch(0.7 0.17 160); /* emerald */
+  --accent-foreground: oklch(0.16 0.03 160);
+  --destructive: oklch(0.62 0.24 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.34 0.03 162);
+  --input: oklch(0.32 0.03 162);
+  --ring: oklch(0.82 0.16 85);
+  --radius: 0.875rem;
+
+  /* Table + brand accents */
+  --felt: oklch(0.32 0.07 160);
+  --felt-deep: oklch(0.24 0.06 162);
+  --gold: oklch(0.82 0.16 85);
+  --gold-bright: oklch(0.9 0.17 92);
+  --neon-cyan: oklch(0.82 0.14 200);
+  --neon-magenta: oklch(0.72 0.22 350);
+  --chip-red: oklch(0.6 0.22 22);
+  --chip-blue: oklch(0.6 0.16 250);
+  --chip-green: oklch(0.62 0.16 150);
+  --chip-black: oklch(0.28 0.02 260);
+}
+
+.dark {
+  --background: oklch(0.16 0.03 160);
+  --foreground: oklch(0.97 0.01 150);
+  --card: oklch(0.2 0.035 162);
+  --card-foreground: oklch(0.97 0.01 150);
+  --popover: oklch(0.18 0.03 162);
+  --popover-foreground: oklch(0.97 0.01 150);
+  --primary: oklch(0.82 0.16 85);
+  --primary-foreground: oklch(0.18 0.04 80);
+  --secondary: oklch(0.28 0.04 162);
+  --secondary-foreground: oklch(0.97 0.01 150);
+  --muted: oklch(0.26 0.03 162);
+  --muted-foreground: oklch(0.72 0.02 150);
+  --accent: oklch(0.7 0.17 160);
+  --accent-foreground: oklch(0.14 0.03 160);
+  --destructive: oklch(0.62 0.24 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.32 0.03 162);
+  --input: oklch(0.3 0.03 162);
+  --ring: oklch(0.82 0.16 85);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-felt: var(--felt);
+  --color-felt-deep: var(--felt-deep);
+  --color-gold: var(--gold);
+  --color-gold-bright: var(--gold-bright);
+  --color-neon-cyan: var(--neon-cyan);
+  --color-neon-magenta: var(--neon-magenta);
+  --color-chip-red: var(--chip-red);
+  --color-chip-blue: var(--chip-blue);
+  --color-chip-green: var(--chip-green);
+  --color-chip-black: var(--chip-black);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* ---- Reusable flashy utilities ---- */
+@utility text-gold {
+  color: var(--gold);
+}
+
+@utility glow-gold {
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--gold) 60%, transparent),
+    0 0 24px color-mix(in oklch, var(--gold) 35%, transparent);
+}
+
+@utility glow-cyan {
+  box-shadow: 0 0 24px color-mix(in oklch, var(--neon-cyan) 45%, transparent);
+}
+
+/* Animated felt table backdrop */
+.felt-table {
+  background:
+    radial-gradient(ellipse 120% 90% at 50% 0%, var(--felt) 0%, var(--felt-deep) 70%, var(--background) 100%);
+}
+
+.felt-table::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    color-mix(in oklch, var(--foreground) 4%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 22px 22px;
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-gold {
+  background: linear-gradient(
+    100deg,
+    var(--gold) 20%,
+    var(--gold-bright) 50%,
+    var(--gold) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes float-up {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

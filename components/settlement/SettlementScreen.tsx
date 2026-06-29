@@ -1,0 +1,68 @@
+'use client'
+
+import { motion } from 'framer-motion'
+import { Panel } from '@/components/ui/input'
+import { formatChips, cn } from '@/lib/utils'
+import type { SettlementRow } from '@/lib/supabase/types'
+
+export function SettlementScreen({ settlement }: { settlement: SettlementRow }) {
+  const nets = [...settlement.net_by_seat].sort((a, b) => b.net - a.net)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mx-auto w-full max-w-2xl space-y-6 p-4"
+    >
+      <h1 className="text-center text-3xl font-extrabold">
+        <span className="shimmer-gold">최종 정산</span>
+      </h1>
+
+      <Panel className="divide-y divide-border">
+        {nets.map((n) => (
+          <div key={n.seatId} className="flex items-center justify-between gap-3 p-4">
+            <div>
+              <div className="font-semibold">{n.displayName}</div>
+              <div className="text-xs text-muted-foreground">
+                바이인 {formatChips(n.buyIn)} → 잔액 {formatChips(n.stack)}
+              </div>
+            </div>
+            <div
+              className={cn(
+                'text-xl font-extrabold tabular-nums',
+                n.net > 0 ? 'text-accent' : n.net < 0 ? 'text-destructive' : 'text-muted-foreground'
+              )}
+            >
+              {n.net > 0 ? '+' : ''}
+              {formatChips(n.net)}
+            </div>
+          </div>
+        ))}
+      </Panel>
+
+      {settlement.transfers.length > 0 ? (
+        <Panel className="space-y-2 p-4">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-gold">정산 송금</h2>
+          {settlement.transfers.map((t, i) => {
+            const from = settlement.net_by_seat.find((s) => s.seatId === t.fromSeat)
+            const to = settlement.net_by_seat.find((s) => s.seatId === t.toSeat)
+            return (
+              <div key={i} className="flex items-center justify-between rounded-lg bg-black/20 px-3 py-2">
+                <span>
+                  <span className="font-semibold text-destructive">{from?.displayName}</span>
+                  {' → '}
+                  <span className="font-semibold text-accent">{to?.displayName}</span>
+                </span>
+                <span className="font-bold tabular-nums text-gold">{formatChips(t.amount)}</span>
+              </div>
+            )
+          })}
+        </Panel>
+      ) : (
+        <p className="text-center text-sm text-muted-foreground">
+          AI 딜러 게임은 각자 하우스 대비 손익만 표시됩니다.
+        </p>
+      )}
+    </motion.div>
+  )
+}
