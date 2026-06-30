@@ -12,7 +12,6 @@ import { SeatPod } from '@/components/table/SeatPod'
 import { DealerArea } from '@/components/table/DealerArea'
 import { CenterStage } from '@/components/game/CenterStage'
 import { ActionBar } from '@/components/game/ActionBar'
-import { DealerActionBar } from '@/components/game/DealerActionBar'
 import { BetControls } from '@/components/game/BetControls'
 import { SettlementScreen } from '@/components/settlement/SettlementScreen'
 import { HostSettlementPanel } from '@/components/game/HostSettlementPanel'
@@ -59,12 +58,9 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
 
   const activeSeat = seats.find((s) => hands.some((h) => h.id === activeHandId && h.seat_id === s.id))
   const isMyTurn = !!myActiveHand
-  // Human dealer playing their own hand during the dealer turn.
-  const isMyDealerTurn =
-    !!mySeat?.is_dealer && round?.phase === 'dealer_turn' && !!dealerHand && activeHandId === dealerHand.id
 
   // ---- Sound effects on key transitions ----
-  const myTurnNow = isMyTurn || isMyDealerTurn
+  const myTurnNow = isMyTurn
   const prev = useRef({ phase: '', myTurn: false, cards: 0, busts: 0, init: false })
   useEffect(() => {
     const phase = round?.phase ?? ''
@@ -162,7 +158,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
                 secondsLeft={secondsLeft}
                 turnSeconds={config?.turn_timer_seconds ?? 30}
                 activePlayerName={activeSeat?.display_name ?? null}
-                isMyTurn={isMyTurn || isMyDealerTurn}
+                isMyTurn={isMyTurn}
                 resultNet={
                   round?.phase === 'complete' && mySeat && !mySeat.is_dealer && myHands.length
                     ? myHands.reduce((s, h) => s + ((h.payout ?? 0) - h.bet_amount), 0)
@@ -206,8 +202,6 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
         {/* Primary contextual control */}
         {!mySeat ? (
           <JoinCta roomId={roomId} disabled={busy !== null} />
-        ) : isMyDealerTurn && dealerHand && round ? (
-          <DealerActionBar roundId={round.id} dealerHand={dealerHand} />
         ) : round?.phase === 'player_turns' && myActiveHand && config ? (
           <ActionBar
             roundId={round.id}

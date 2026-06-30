@@ -105,15 +105,6 @@ export function CreateRoomForm() {
                 { v: '6:5', label: '6:5' },
               ]}
             />
-            <Choice
-              label="딜러 소프트17"
-              value={form.dealerHitsSoft17 ? 'hit' : 'stand'}
-              onChange={(v) => set('dealerHitsSoft17', v === 'hit')}
-              options={[
-                { v: 'stand', label: '스탠드' },
-                { v: 'hit', label: '히트' },
-              ]}
-            />
           </div>
 
           {/* Real-money stake — default 1코인 = 1원. */}

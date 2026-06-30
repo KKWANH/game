@@ -122,9 +122,23 @@
   color: var(--gold);
 }
 
+/* Soft, ringless gold glow — no hard outline (we keep highlights line-free). */
 @utility glow-gold {
-  box-shadow: 0 0 0 1px color-mix(in oklch, var(--gold) 60%, transparent),
-    0 0 24px color-mix(in oklch, var(--gold) 35%, transparent);
+  box-shadow: 0 0 26px 3px color-mix(in oklch, var(--gold) 32%, transparent);
+}
+
+/* Active turn indicator: a gentle breathing glow instead of a ring/line. */
+@keyframes activePulse {
+  0%,
+  100% {
+    box-shadow: 0 0 16px 2px color-mix(in oklch, var(--gold) 24%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 34px 7px color-mix(in oklch, var(--gold) 46%, transparent);
+  }
+}
+@utility active-glow {
+  animation: activePulse 1.9s ease-in-out infinite;
 }
 
 @utility glow-cyan {
@@ -154,13 +168,32 @@
   box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.45);
 }
 
+/* A slow, soft light drifting across the felt — replaces the old hard gold
+   border line (which clashed with the active-seat highlight). */
 .felt-surface::after {
   content: '';
   position: absolute;
-  inset: 6%;
-  border-radius: 2.2rem;
-  border: 2px solid color-mix(in oklch, var(--gold) 26%, transparent);
+  inset: 0;
+  border-radius: inherit;
   pointer-events: none;
+  background: radial-gradient(
+    ellipse 55% 45% at 50% 28%,
+    color-mix(in oklch, var(--gold) 8%, transparent),
+    transparent 62%
+  );
+  animation: feltSheen 11s ease-in-out infinite;
+}
+
+@keyframes feltSheen {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: translateX(-5%);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateX(5%);
+  }
 }
 
 .felt-table::before {

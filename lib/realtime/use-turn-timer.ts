@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { timeoutTurn, bettingTimeout, dealerTimeout, autoNextRound } from '@/actions/game-actions'
+import { timeoutTurn, bettingTimeout, autoNextRound } from '@/actions/game-actions'
 
 const AUTO_NEXT_MS = 5000 // pause on the result before the next round opens
 
@@ -22,9 +22,10 @@ export function useTurnTimer(
 ) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
 
-  // Countdown + timeout for betting / player turns / a human dealer's turn.
+  // Countdown + timeout for betting / player turns. (The dealer hand auto-plays
+  // server-side — there is no human dealer turn to time.)
   useEffect(() => {
-    const timed = phase === 'player_turns' || phase === 'betting' || phase === 'dealer_turn'
+    const timed = phase === 'player_turns' || phase === 'betting'
     if (!roundId || !deadlineIso || !timed) {
       setSecondsLeft(null)
       return
@@ -33,7 +34,7 @@ export function useTurnTimer(
     let fired = false
     let sawPositive = false
     const fire = () => {
-      const action = phase === 'betting' ? bettingTimeout : phase === 'dealer_turn' ? dealerTimeout : timeoutTurn
+      const action = phase === 'betting' ? bettingTimeout : timeoutTurn
       setTimeout(() => action(roundId).catch(() => {}), 150 + Math.floor(Math.random() * 400))
     }
     const tick = () => {

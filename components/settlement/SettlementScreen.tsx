@@ -24,6 +24,8 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
     settlement.aiNet ?? nets.filter((n) => n.isAi).reduce((s, n) => s + n.net, 0)
   const humanCount = nets.filter((n) => !n.isAi).length
   const money = moneyFromSettlement(settlement)
+  // No dealer seat → the dealer was a virtual AI house (players pooled the result).
+  const aiDealerGame = !nets.some((n) => n.isDealer)
 
   return (
     <motion.div
@@ -79,6 +81,13 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
         </p>
       )}
 
+      {aiDealerGame && (
+        <p className="rounded-xl bg-neon-cyan/10 px-4 py-3 text-center text-sm leading-relaxed text-neon-cyan">
+          🤖 AI 딜러(하우스) 게임 — 봇과의 공동 손익은 실제 돈이 아니므로, 친구끼리{' '}
+          <b>서로의 차이만</b> 정산합니다 (모두 평균에 맞춰 정산).
+        </p>
+      )}
+
       {settlement.transfers.length > 0 ? (
         <Panel className="space-y-2 p-4">
           <h2 className="text-sm font-bold uppercase tracking-widest text-gold">정산 송금</h2>
@@ -102,7 +111,7 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
         </Panel>
       ) : (
         <p className="text-center text-sm text-muted-foreground">
-          AI 딜러 게임은 각자 하우스 대비 손익만 표시됩니다.
+          서로 정산할 차액이 없습니다.
         </p>
       )}
     </motion.div>

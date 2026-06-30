@@ -47,12 +47,12 @@ export function HandView({
     <motion.div
       animate={
         won
-          ? { boxShadow: '0 0 0 2px var(--gold), 0 0 28px 4px color-mix(in oklch, var(--gold) 45%, transparent)' }
-          : { boxShadow: '0 0 0 0px transparent' }
+          ? { boxShadow: '0 0 34px 7px color-mix(in oklch, var(--gold) 48%, transparent)' }
+          : { boxShadow: '0 0 0 0 transparent' }
       }
       className={cn(
         'relative flex flex-col items-center gap-1.5 rounded-2xl p-2 transition-all',
-        isActive && 'glow-gold ring-2 ring-gold',
+        isActive && 'active-glow',
         lost && 'opacity-70'
       )}
     >

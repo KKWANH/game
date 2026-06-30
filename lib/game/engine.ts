@@ -458,50 +458,6 @@ export function computeDealerSettlePatch(state: RoundState, dealerHandId: string
   return { patch: buildSettlement(state, dealerHandId, dealerCards, insertCards, drawer.cursor) }
 }
 
-/** Human dealer: reveal the hole and hand the turn to the dealer. */
-export function computeDealerRevealPatch(state: RoundState, dealerHandId: string): { patch: RoundPatch } {
-  const hole = dealerHole(state)
-  return {
-    patch: {
-      insert_cards: [{ hand_id: dealerHandId, card_index: 1, rank: hole.rank, suit: hole.suit }],
-      reveal_hole: true,
-      round: { active_hand_id: dealerHandId, turn_deadline: deadline(state.config.turn_timer_seconds) },
-    },
-  }
-}
-
-/** Human dealer takes one card. Returns whether the hand busted. */
-export function computeDealerHitPatch(state: RoundState, dealerHandId: string): { patch: RoundPatch; bust: boolean } {
-  const drawer = makeDrawer(state)
-  const dealerHand = state.hands.find((h) => h.id === dealerHandId)
-  if (!dealerHand) throw new Error('dealer hand missing')
-  const cards = toCards(dealerHand)
-  const c = drawer.draw()
-  const total = handTotal([...cards, c])
-  const bust = total.isBust
-  return {
-    patch: {
-      insert_cards: [{ hand_id: dealerHandId, card_index: cards.length, rank: c.rank, suit: c.suit }],
-      deck_cursor: drawer.cursor,
-      round: bust ? {} : { active_hand_id: dealerHandId, turn_deadline: deadline(state.config.turn_timer_seconds) },
-    },
-    bust,
-  }
-}
-
-/** Human dealer stands (or has busted): settle against current cards. */
-export function computeDealerStandPatch(state: RoundState, dealerHandId: string): { patch: RoundPatch } {
-  const dealerHand = state.hands.find((h) => h.id === dealerHandId)
-  if (!dealerHand) throw new Error('dealer hand missing')
-  const dealerCards = toCards(dealerHand) // hole already revealed + any hits
-  return { patch: buildSettlement(state, dealerHandId, dealerCards, [], state.deckCursor) }
-}
-
-/** Is this round's dealer a human (occupies a seat)? */
-export function hasHumanDealer(state: RoundState): boolean {
-  return !!state.room.dealer_seat_id
-}
-
 export function dealerUpcard(state: RoundState): Card {
   const dealer = state.hands.find((h) => h.is_dealer)
   if (!dealer || dealer.cards.length === 0) {

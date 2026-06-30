@@ -91,7 +91,7 @@ export function SeatPod({
         className={cn(
           'flex w-full flex-col items-center gap-0.5 rounded-2xl border px-2 py-1.5 text-center',
           isMe ? 'border-gold/60 bg-gold/10' : 'border-border bg-card/70',
-          isActive && 'glow-gold border-gold'
+          isActive && 'active-glow'
         )}
       >
         <div className="flex items-center gap-1.5">

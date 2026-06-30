@@ -68,11 +68,23 @@ function computeStandings(
 
   let transfers: { fromSeat: string; toSeat: string; amount: number }[] = []
   if (dealerType === 'human') {
-    // Settle among the humans only, on the AI-adjusted nets.
+    // Human dealer is the bank: the table is zero-sum, so settle the humans
+    // directly on their AI-adjusted nets.
     const nets: SeatNet[] = netBySeat
       .filter((n) => !n.isAi)
       .map((n) => ({ seatId: n.seatId, net: n.settleNet }))
     transfers = minCashFlow(nets)
+  } else {
+    // AI dealer = a virtual house (no real banker). The collective win/loss vs
+    // the bot isn't real money, so friends settle only the DIFFERENCES between
+    // each other: pool the result and bring everyone to the group average. The
+    // luckier players compensate the unluckier ones; nobody pays a bot.
+    const players = netBySeat.filter((n) => !n.isAi && !n.isDealer)
+    if (players.length > 1) {
+      const avg = players.reduce((sum, n) => sum + n.settleNet, 0) / players.length
+      const pooled: SeatNet[] = players.map((n) => ({ seatId: n.seatId, net: Math.round(avg - n.settleNet) }))
+      transfers = minCashFlow(pooled)
+    }
   }
   return { netBySeat, transfers, aiNet, money }
 }

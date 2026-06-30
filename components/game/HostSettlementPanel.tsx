@@ -226,6 +226,12 @@ export function HostSettlementPanel({
             </p>
           )}
 
+          {standings && !nets.some((n) => n.isDealer) && (
+            <p className="mb-3 rounded-xl bg-neon-cyan/10 px-3 py-2 text-xs leading-relaxed text-neon-cyan">
+              🤖 AI 딜러(하우스) 게임 — 봇과의 공동 손익은 빼고 친구끼리 <b>차이만</b> 정산합니다.
+            </p>
+          )}
+
           {standings && standings.transfers.length > 0 && (
             <div className="mb-5 space-y-1 rounded-2xl bg-black/20 p-3">
               <div className="text-xs font-bold uppercase tracking-widest text-gold">제안 송금</div>
