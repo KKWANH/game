@@ -6,7 +6,9 @@ import { createServiceClient } from '@/lib/supabase/service'
 import type { Database } from '@/lib/supabase/types'
 import { requireUser } from '@/lib/game/auth'
 import { loadRoundState } from '@/lib/game/load'
-import type { RoundState } from '@/lib/game/types'
+import { rulesFromConfig, type RoundState } from '@/lib/game/types'
+import { legalActions, decideBet, decidePlay, type HandView, type Rank, type Suit } from '@/lib/blackjack'
+import { dealerUpcard } from '@/lib/game/engine'
 import { commitRound, freshShoe, VersionConflict } from '@/lib/game/commit'
 import {
   computeActionPatch,
@@ -349,6 +351,57 @@ export async function dealerAction(input: z.input<typeof DealerActionSchema>) {
       const { patch: sp } = computeDealerStandPatch(fresh, dealerHandId)
       await commitRound(service, p.roundId, fresh.round.version, sp).catch(() => {})
     }
+  }
+  return { ok: true }
+}
+
+/** Drive the AI seat whose turn it is (betting or playing). Any client fires
+ *  this when the active turn belongs to an AI; the server validates + applies. */
+export async function aiAct(roundId: string) {
+  await requireUser()
+  const service = createServiceClient()
+  const state = await loadRoundState(service, roundId)
+  const activeId = state.round.active_hand_id
+  if (!activeId) return { ok: true }
+  const hand = state.hands.find((h) => h.id === activeId)
+  const seat = state.seats.find((s) => s.id === hand?.seat_id)
+  if (!hand || !seat || !seat.is_ai || seat.is_dealer) return { ok: true } // not an AI's turn
+  const difficulty = seat.ai_difficulty
+
+  if (state.round.phase === 'betting') {
+    const amount = decideBet(rulesFromConfig(state.config), seat.chip_stack, state.config.min_bet, state.config.max_bet, difficulty)
+    return advanceBetting(service, state, hand.id, amount)
+  }
+
+  if (state.round.phase === 'player_turns') {
+    const cards = [...hand.cards]
+      .sort((a, b) => a.card_index - b.card_index)
+      .map((c) => ({ rank: c.rank as Rank, suit: c.suit as Suit }))
+    const view: HandView = {
+      cards,
+      bet: hand.bet_amount,
+      splitDepth: hand.split_depth,
+      isDoubled: hand.is_doubled,
+      fromSplit: hand.split_depth > 0,
+      isSplitAces: hand.is_split_aces,
+    }
+    const rules = rulesFromConfig(state.config)
+    const splitCount = state.hands.filter((h) => h.seat_id === seat.id && !h.is_dealer).length
+    const legal = legalActions(view, rules, {
+      availableChips: seat.chip_stack,
+      currentSplitCount: splitCount,
+      dealerUpcard: dealerUpcard(state),
+    })
+    const action = legal.length === 0 ? 'stand' : decidePlay(view, dealerUpcard(state), legal, difficulty)
+    const { patch, enterDealer } = computeActionPatch(state, hand.id, action as Action)
+    try {
+      await commitRound(service, roundId, state.round.version, patch)
+    } catch (e) {
+      if (e instanceof VersionConflict) return { conflict: true }
+      throw e
+    }
+    if (enterDealer && state.round.dealer_hand_id) await runDealerSettle(service, roundId, state.round.dealer_hand_id)
+    return { ok: true }
   }
   return { ok: true }
 }

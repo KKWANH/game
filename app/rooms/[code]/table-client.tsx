@@ -16,8 +16,8 @@ import { DealerActionBar } from '@/components/game/DealerActionBar'
 import { BetControls } from '@/components/game/BetControls'
 import { SettlementScreen } from '@/components/settlement/SettlementScreen'
 import { HostSettlementPanel } from '@/components/game/HostSettlementPanel'
-import { startRound } from '@/actions/game-actions'
-import { takeSeat, buyIn } from '@/actions/room-actions'
+import { startRound, aiAct } from '@/actions/game-actions'
+import { takeSeat, buyIn, addAiSeat, removeSeat } from '@/actions/room-actions'
 import { formatChips } from '@/lib/utils'
 import type { Card, Rank, Suit } from '@/lib/blackjack'
 
@@ -36,6 +36,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
   const secondsLeft = useTurnTimer(round?.id ?? null, roomId, round?.turn_deadline ?? null, round?.phase ?? null)
   const [panelOpen, setPanelOpen] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
+  const [aiDiff, setAiDiff] = useState<'easy' | 'normal' | 'hard'>('normal')
 
   const hands = handsWithCards()
   const dealerHand = hands.find((h) => h.is_dealer) ?? null
@@ -79,6 +80,18 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
     window.addEventListener('pointerdown', unlock, { once: true })
     return () => window.removeEventListener('pointerdown', unlock)
   }, [])
+
+  // Drive an AI seat when it's its turn (betting or playing). Any client fires
+  // it after a short "thinking" delay; the server is idempotent (version guard).
+  useEffect(() => {
+    const phase = round?.phase
+    if (!round || (phase !== 'betting' && phase !== 'player_turns')) return
+    const activeHand = hands.find((h) => h.id === round.active_hand_id)
+    const activeSeatObj = seats.find((s) => s.id === activeHand?.seat_id)
+    if (!activeSeatObj?.is_ai) return
+    const id = setTimeout(() => aiAct(round.id).catch(() => {}), 900 + Math.floor(Math.random() * 500))
+    return () => clearTimeout(id)
+  }, [round, hands, seats])
   const insuranceOffered =
     round?.phase === 'player_turns' && !!config?.allow_insurance && dealerUpcard?.rank === 'A'
 
@@ -154,8 +167,10 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
                         hands={s ? hands.filter((h) => h.seat_id === s.id && !h.is_dealer) : []}
                         activeHandId={activeHandId}
                         isMe={s?.id === mySeat?.id}
-                        present={s?.user_id ? present.includes(s.user_id) : false}
+                        present={s?.user_id ? present.includes(s.user_id) : !!s?.is_ai}
                         canJoin={canJoin}
+                        canRemove={isHost && !!s?.is_ai}
+                        onRemove={s ? () => run('rmai', () => removeSeat(roomId, s.id)) : undefined}
                         onJoin={() => run('join', () => takeSeat({ roomId, seatIndex: i, startingChips: 1000 }))}
                       />
                     </div>
@@ -213,6 +228,21 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
                   게임 시작
                 </Button>
               )}
+              <button
+                onClick={() => setAiDiff((d) => (d === 'easy' ? 'normal' : d === 'normal' ? 'hard' : 'easy'))}
+                className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-gold"
+                title="AI 난이도"
+              >
+                {aiDiff === 'easy' ? '쉬움' : aiDiff === 'normal' ? '보통' : '어려움'}
+              </button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy !== null || playerSeats.length >= maxSeats}
+                onClick={() => run('addai', () => addAiSeat(roomId, aiDiff))}
+              >
+                🤖 AI 추가
+              </Button>
               <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => setPanelOpen(true)}>
                 정산 / 재배분
               </Button>

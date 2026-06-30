@@ -73,6 +73,8 @@ export type SeatRow = {
   user_id: string | null
   display_name: string
   is_dealer: boolean
+  is_ai: boolean
+  ai_difficulty: 'easy' | 'normal' | 'hard'
   chip_stack: number
   total_buy_in: number
   status: SeatStatus

@@ -15,6 +15,8 @@ export function SeatPod({
   isMe,
   present,
   canJoin,
+  canRemove,
+  onRemove,
   onJoin,
 }: {
   seat: SeatRow | null
@@ -23,6 +25,8 @@ export function SeatPod({
   isMe: boolean
   present: boolean
   canJoin: boolean
+  canRemove?: boolean
+  onRemove?: () => void
   onJoin?: () => void
 }) {
   const isActive = !!activeHandId && hands.some((h) => h.id === activeHandId)
@@ -50,7 +54,16 @@ export function SeatPod({
   }
 
   return (
-    <div className="flex w-24 flex-col items-center gap-2 sm:w-28">
+    <div className="relative flex w-24 flex-col items-center gap-2 sm:w-28">
+      {canRemove && (
+        <button
+          onClick={onRemove}
+          className="absolute -top-1 right-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-destructive/80 text-[10px] font-bold text-destructive-foreground hover:bg-destructive"
+          title="AI 내보내기"
+        >
+          ✕
+        </button>
+      )}
       {/* Cards */}
       <div className="flex min-h-[112px] items-end justify-center">
         {hands.length === 0 ? (

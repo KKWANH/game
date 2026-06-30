@@ -180,6 +180,54 @@ export async function leaveSeat(seatId: string) {
   await service.from('seats').update({ status: 'left', user_id: null }).eq('id', seatId)
 }
 
+const DIFF_LABEL: Record<string, string> = { easy: '쉬움', normal: '보통', hard: '어려움' }
+
+/** Host adds an AI player to an empty seat. */
+export async function addAiSeat(roomId: string, difficulty: 'easy' | 'normal' | 'hard' = 'normal', startingChips = 1000) {
+  const user = await requireUser()
+  const service = createServiceClient()
+
+  const { data: room } = await service.from('rooms').select('host_user_id').eq('id', roomId).single()
+  if (!room || room.host_user_id !== user.id) throw new Error('호스트만 AI를 추가할 수 있습니다.')
+
+  const { data: config } = await service.from('room_config').select('max_seats').eq('room_id', roomId).single()
+  const { data: seats } = await service.from('seats').select('seat_index, status').eq('room_id', roomId)
+  const taken = new Set((seats ?? []).filter((s) => s.status !== 'left').map((s) => s.seat_index))
+  let index: number | undefined
+  for (let i = 0; i < (config?.max_seats ?? 6); i++) {
+    if (!taken.has(i)) { index = i; break }
+  }
+  if (index === undefined) throw new Error('빈 자리가 없습니다.')
+
+  const { data: seat, error } = await service
+    .from('seats')
+    .insert({
+      room_id: roomId,
+      seat_index: index,
+      user_id: null,
+      display_name: `🤖 AI (${DIFF_LABEL[difficulty]})`,
+      is_dealer: false,
+      is_ai: true,
+      ai_difficulty: difficulty,
+      chip_stack: 0,
+    })
+    .select('id')
+    .single()
+  if (error || !seat) throw new Error('AI 추가 실패: ' + error?.message)
+  if (startingChips > 0) await service.rpc('apply_buy_in', { p_seat_id: seat.id, p_amount: startingChips })
+  return { seatId: seat.id }
+}
+
+/** Host removes a seat (AI or, as a kick, a player). */
+export async function removeSeat(roomId: string, seatId: string) {
+  const user = await requireUser()
+  const service = createServiceClient()
+  const { data: room } = await service.from('rooms').select('host_user_id').eq('id', roomId).single()
+  if (!room || room.host_user_id !== user.id) throw new Error('호스트만 가능합니다.')
+  await service.from('seats').update({ status: 'left', user_id: null }).eq('id', seatId)
+  return { ok: true }
+}
+
 export async function closeRoom(roomId: string) {
   const user = await requireUser()
   const service = createServiceClient()
