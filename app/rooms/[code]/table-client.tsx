@@ -14,7 +14,6 @@ import { ActionBar } from '@/components/game/ActionBar'
 import { BetControls } from '@/components/game/BetControls'
 import { SettlementScreen } from '@/components/settlement/SettlementScreen'
 import { HostSettlementPanel } from '@/components/game/HostSettlementPanel'
-import { FloatingSuits } from '@/components/effects/FloatingSuits'
 import { startRound } from '@/actions/game-actions'
 import { takeSeat, buyIn } from '@/actions/room-actions'
 import { formatChips } from '@/lib/utils'
@@ -90,48 +89,54 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
         maxSeats={maxSeats}
       />
 
-      <main className="felt-table relative flex flex-1 flex-col justify-center gap-6 overflow-hidden border-y-2 border-gold/15 p-3 sm:justify-between sm:gap-0 sm:p-6">
-        <FloatingSuits />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 [background:radial-gradient(50%_100%_at_50%_0%,color-mix(in_oklch,var(--gold)_12%,transparent),transparent)]" />
+      <main className="flex flex-1 items-center justify-center overflow-hidden p-2 sm:p-5">
+        <div className="wood-rim relative w-full max-w-4xl rounded-[2.2rem] p-2 sm:rounded-[3.5rem] sm:p-[14px]">
+          <div className="felt-surface relative flex min-h-[58vh] flex-col items-center justify-between overflow-hidden rounded-[1.6rem] p-4 pb-3 sm:min-h-[60vh] sm:rounded-[3rem] sm:p-7">
+            {/* Dealer */}
+            <div className="relative z-10 flex flex-col items-center gap-1">
+              <DealerArea dealerHand={dealerHand} phase={round?.phase ?? null} />
+              {dealerSeat && (
+                <span className="text-xs text-muted-foreground">
+                  뱅크 · {dealerSeat.display_name} · {formatChips(dealerSeat.chip_stack)}
+                </span>
+              )}
+            </div>
 
-        {/* Dealer */}
-        <div className="relative z-10 flex flex-col items-center gap-1">
-          <DealerArea dealerHand={dealerHand} phase={round?.phase ?? null} />
-          {dealerSeat && (
-            <span className="text-xs text-muted-foreground">
-              뱅크 · {dealerSeat.display_name} · {formatChips(dealerSeat.chip_stack)}
-            </span>
-          )}
-        </div>
-
-        {/* Center stage fills the middle (desktop) / clusters (mobile) */}
-        <div className="relative z-10 flex items-center justify-center py-2 sm:flex-1">
-          <CenterStage
-            status={room?.status ?? null}
-            phase={round?.phase ?? null}
-            secondsLeft={secondsLeft}
-            turnSeconds={config?.turn_timer_seconds ?? 30}
-            activePlayerName={activeSeat?.display_name ?? null}
-            isMyTurn={isMyTurn}
-          />
-        </div>
-
-        {/* Players — a single centered row that scrolls horizontally on small
-            screens instead of wrapping into a tall, empty stack. */}
-        <div className="relative z-10 -mx-3 overflow-x-auto px-3 pb-1 sm:mx-0 sm:px-0">
-          <div className="mx-auto flex w-max items-end gap-2 sm:gap-4">
-            {slots.map((s, i) => (
-              <SeatPod
-                key={s?.id ?? `empty-${i}`}
-                seat={s}
-                hands={s ? hands.filter((h) => h.seat_id === s.id && !h.is_dealer) : []}
-                activeHandId={activeHandId}
-                isMe={s?.id === mySeat?.id}
-                present={s?.user_id ? present.includes(s.user_id) : false}
-                canJoin={canJoin}
-                onJoin={() => run('join', () => takeSeat({ roomId, seatIndex: i, startingChips: 1000 }))}
+            {/* Center stage */}
+            <div className="relative z-10 flex flex-1 items-center justify-center py-2">
+              <CenterStage
+                status={room?.status ?? null}
+                phase={round?.phase ?? null}
+                secondsLeft={secondsLeft}
+                turnSeconds={config?.turn_timer_seconds ?? 30}
+                activePlayerName={activeSeat?.display_name ?? null}
+                isMyTurn={isMyTurn}
               />
-            ))}
+            </div>
+
+            {/* Players — arced along the bottom of the table; scrolls on small screens */}
+            <div className="relative z-10 -mx-2 w-full overflow-x-auto px-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="mx-auto flex w-max items-end gap-1 sm:gap-3">
+                {slots.map((s, i) => {
+                  const center = (maxSeats - 1) / 2
+                  const d = center === 0 ? 0 : Math.abs(i - center) / center
+                  const dip = (1 - d * d) * 14 // middle seats sit slightly lower → bottom arc
+                  return (
+                    <div key={s?.id ?? `empty-${i}`} style={{ transform: `translateY(${dip}px)` }}>
+                      <SeatPod
+                        seat={s}
+                        hands={s ? hands.filter((h) => h.seat_id === s.id && !h.is_dealer) : []}
+                        activeHandId={activeHandId}
+                        isMe={s?.id === mySeat?.id}
+                        present={s?.user_id ? present.includes(s.user_id) : false}
+                        canJoin={canJoin}
+                        onJoin={() => run('join', () => takeSeat({ roomId, seatIndex: i, startingChips: 1000 }))}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </main>

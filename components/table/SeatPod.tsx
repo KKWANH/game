@@ -31,7 +31,7 @@ export function SeatPod({
     // Mirror the occupied pod's structure (card area on top, nameplate-height
     // control at the bottom) so empty and occupied seats bottom-align.
     return (
-      <div className="flex w-28 flex-col items-center gap-2 sm:w-32">
+      <div className="flex w-24 flex-col items-center gap-2 sm:w-28">
         <div className="flex min-h-[112px] items-end justify-center">
           <div className="h-[4.5rem] w-12 rounded-lg border-2 border-dashed border-border/30" />
         </div>
@@ -50,7 +50,7 @@ export function SeatPod({
   }
 
   return (
-    <div className="flex w-28 flex-col items-center gap-2 sm:w-32">
+    <div className="flex w-24 flex-col items-center gap-2 sm:w-28">
       {/* Cards */}
       <div className="flex min-h-[112px] items-end justify-center">
         {hands.length === 0 ? (
