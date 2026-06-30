@@ -3,6 +3,7 @@ import { signOut } from '@/actions/auth-actions'
 import { SignInButton } from '@/components/lobby/SignInButton'
 import { CreateRoomForm } from '@/components/lobby/CreateRoomForm'
 import { JoinRoomForm } from '@/components/lobby/JoinRoomForm'
+import { RoomBrowser } from '@/components/lobby/RoomBrowser'
 import { Button } from '@/components/ui/button'
 import { FloatingSuits } from '@/components/effects/FloatingSuits'
 import { Hero } from '@/components/lobby/Hero'
@@ -63,6 +64,8 @@ export default async function Home() {
               <CreateRoomForm />
               <JoinRoomForm />
             </div>
+
+            <RoomBrowser />
           </>
         )}
 
