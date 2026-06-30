@@ -406,6 +406,9 @@ export function computeDealerSettlePatch(
   const dealerBJ = isBlackjack([upCard, hole])
   const updateHands: RoundPatch['update_hands'] = []
   const ledger: RoundPatch['ledger'] = []
+  // Net flow to the dealer/bank = everything players staked minus everything
+  // they're paid. Credited to the dealer seat below (human dealer only).
+  let dealerNet = 0
 
   // Settle every player hand.
   for (const h of state.hands.filter((x) => !x.is_dealer)) {
@@ -416,18 +419,14 @@ export function computeDealerSettlePatch(
     // Insurance side bet resolves against dealer blackjack.
     if (h.insurance_bet > 0) {
       const insReturn = settleInsurance(h.insurance_bet, dealerBJ)
+      dealerNet += h.insurance_bet - insReturn
       if (insReturn > 0) {
-        ledger.push({
-          seat_id: seatId,
-          round_id: state.round.id,
-          hand_id: h.id,
-          type: 'insurance_payout',
-          amount: insReturn,
-        })
+        ledger.push({ seat_id: seatId, round_id: state.round.id, hand_id: h.id, type: 'insurance_payout', amount: insReturn })
       }
     }
 
     if (h.status === 'busted') {
+      dealerNet += h.bet_amount // dealer keeps the busted stake
       updateHands.push({ id: h.id, status: 'settled', outcome: 'lose', payout: 0 })
       continue
     }
@@ -437,21 +436,17 @@ export function computeDealerSettlePatch(
       { cards: dealerCards },
       rules
     )
+    dealerNet += h.bet_amount - result.payout
     if (result.payout > 0) {
-      ledger.push({
-        seat_id: seatId,
-        round_id: state.round.id,
-        hand_id: h.id,
-        type: 'payout',
-        amount: result.payout,
-      })
+      ledger.push({ seat_id: seatId, round_id: state.round.id, hand_id: h.id, type: 'payout', amount: result.payout })
     }
-    updateHands.push({
-      id: h.id,
-      status: 'settled',
-      outcome: result.outcome,
-      payout: result.payout,
-    })
+    updateHands.push({ id: h.id, status: 'settled', outcome: result.outcome, payout: result.payout })
+  }
+
+  // A human dealer is the bank: their chips move by the net of the table, so
+  // the table is zero-sum. (AI dealer = the house, no seat to credit.)
+  if (state.room.dealer_seat_id && dealerNet !== 0) {
+    ledger.push({ seat_id: state.room.dealer_seat_id, round_id: state.round.id, hand_id: dealerHandId, type: 'payout', amount: dealerNet })
   }
 
   // Mark dealer hand settled.
