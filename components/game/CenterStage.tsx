@@ -10,12 +10,14 @@ export function CenterStage({
   status,
   phase,
   secondsLeft,
+  turnSeconds,
   activePlayerName,
   isMyTurn,
 }: {
   status: RoomStatus | null
   phase: RoundPhase | null
   secondsLeft: number | null
+  turnSeconds: number
   activePlayerName: string | null
   isMyTurn: boolean
 }) {
@@ -68,15 +70,14 @@ export function CenterStage({
       </motion.div>
 
       {showTimer && (
-        <TimerRing seconds={secondsLeft!} urgent={secondsLeft! <= 5} />
+        <TimerRing seconds={secondsLeft!} max={turnSeconds} urgent={secondsLeft! <= 5} />
       )}
     </div>
   )
 }
 
-function TimerRing({ seconds, urgent }: { seconds: number; urgent: boolean }) {
-  const max = 30
-  const pct = Math.max(0, Math.min(1, seconds / max))
+function TimerRing({ seconds, max, urgent }: { seconds: number; max: number; urgent: boolean }) {
+  const pct = Math.max(0, Math.min(1, seconds / Math.max(1, max)))
   const R = 22
   const C = 2 * Math.PI * R
   return (

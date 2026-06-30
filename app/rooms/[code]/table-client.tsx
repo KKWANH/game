@@ -112,6 +112,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
             status={room?.status ?? null}
             phase={round?.phase ?? null}
             secondsLeft={secondsLeft}
+            turnSeconds={config?.turn_timer_seconds ?? 30}
             activePlayerName={activeSeat?.display_name ?? null}
             isMyTurn={isMyTurn}
           />
