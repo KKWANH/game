@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion'
 import { cn, formatChips } from '@/lib/utils'
 import { HandView } from '@/components/cards/Hand'
+import { ChipStack } from '@/components/chips/ChipStack'
 import type { HandWithCards } from '@/store/room-store'
 import type { SeatRow } from '@/lib/supabase/types'
 
@@ -57,13 +58,11 @@ export function SeatPod({
         ) : (
           <div className="flex flex-wrap items-end justify-center gap-1">
             {hands.map((h) => (
-              <div key={h.id} className="flex flex-col items-center">
+              <div key={h.id} className="flex flex-col items-center gap-0.5">
                 <HandView hand={h} isActive={h.id === activeHandId} size="sm" />
-                {h.bet_amount > 0 && (
-                  <span className="mt-0.5 text-[10px] font-bold text-gold">
-                    {formatChips(h.bet_amount)}
-                    {h.insurance_bet > 0 ? ` +ins ${formatChips(h.insurance_bet)}` : ''}
-                  </span>
+                {h.bet_amount > 0 && <ChipStack amount={h.bet_amount} size="sm" />}
+                {h.insurance_bet > 0 && (
+                  <span className="text-[9px] font-bold text-neon-cyan">ins {formatChips(h.insurance_bet)}</span>
                 )}
               </div>
             ))}

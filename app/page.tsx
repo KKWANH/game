@@ -5,6 +5,7 @@ import { CreateRoomForm } from '@/components/lobby/CreateRoomForm'
 import { JoinRoomForm } from '@/components/lobby/JoinRoomForm'
 import { Button } from '@/components/ui/button'
 import { FloatingSuits } from '@/components/effects/FloatingSuits'
+import { Hero } from '@/components/lobby/Hero'
 
 export default async function Home() {
   const user = await getUser()
@@ -20,14 +21,14 @@ export default async function Home() {
       <FloatingSuits />
 
       <div className="relative mx-auto flex max-w-5xl flex-col items-center gap-8 px-4 py-12 sm:py-16">
-        <div className="space-y-3 text-center">
-          <div className="text-6xl">🃏</div>
-          <h1 className="text-4xl font-extrabold sm:text-6xl">
+        <div className="flex flex-col items-center gap-5 text-center">
+          <Hero />
+          <h1 className="text-5xl font-black tracking-tight sm:text-7xl">
             <span className="shimmer-gold">BLACKJACK</span>
           </h1>
-          <p className="max-w-xl text-balance text-muted-foreground">
-            친구끼리 즐기는 실시간 블랙잭. 가상 칩으로 베팅하고, 모든 판이 장부에 기록되며,
-            마지막에 누가 누구에게 줄지 자동 정산됩니다.
+          <p className="max-w-md text-balance leading-relaxed text-muted-foreground">
+            친구끼리 즐기는 실시간 블랙잭.<br className="hidden sm:block" />
+            가상 칩으로 베팅하고, 모든 판이 장부에 기록되어 마지막에 자동 정산됩니다.
           </p>
         </div>
 
