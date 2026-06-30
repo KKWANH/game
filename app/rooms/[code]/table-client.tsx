@@ -150,6 +150,11 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
                 turnSeconds={config?.turn_timer_seconds ?? 30}
                 activePlayerName={activeSeat?.display_name ?? null}
                 isMyTurn={isMyTurn || isMyDealerTurn}
+                resultNet={
+                  round?.phase === 'complete' && mySeat && !mySeat.is_dealer && myHands.length
+                    ? myHands.reduce((s, h) => s + ((h.payout ?? 0) - h.bet_amount), 0)
+                    : null
+                }
               />
             </div>
 
@@ -167,6 +172,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
                         hands={s ? hands.filter((h) => h.seat_id === s.id && !h.is_dealer) : []}
                         activeHandId={activeHandId}
                         isMe={s?.id === mySeat?.id}
+                        cardSize={s && s.id === mySeat?.id ? 'md' : 'sm'}
                         present={s?.user_id ? present.includes(s.user_id) : !!s?.is_ai}
                         canJoin={canJoin}
                         canRemove={isHost && !!s?.is_ai}

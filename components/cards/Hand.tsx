@@ -64,7 +64,7 @@ export function HandView({
           initial={{ scale: 0.6, y: 4, opacity: 0 }}
           animate={{ scale: 1, y: 0, opacity: 1 }}
           className={cn(
-            'z-10 rounded-full px-3 py-0.5 text-xs font-extrabold tracking-wide shadow-lg',
+            'z-10 rounded-full px-3.5 py-1 text-sm font-extrabold tracking-wide shadow-lg',
             won
               ? 'bg-gradient-to-r from-gold-bright to-gold text-primary-foreground'
               : lost

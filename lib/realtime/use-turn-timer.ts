@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { timeoutTurn, bettingTimeout, dealerTimeout, autoNextRound } from '@/actions/game-actions'
 
-const AUTO_NEXT_MS = 4000 // pause on the result before the next round opens
+const AUTO_NEXT_MS = 5000 // pause on the result before the next round opens
 
 /**
  * Drives the automatic game loop from the client:

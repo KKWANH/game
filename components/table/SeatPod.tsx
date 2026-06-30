@@ -18,6 +18,7 @@ export function SeatPod({
   canRemove,
   onRemove,
   onJoin,
+  cardSize = 'sm',
 }: {
   seat: SeatRow | null
   hands: HandWithCards[]
@@ -28,6 +29,7 @@ export function SeatPod({
   canRemove?: boolean
   onRemove?: () => void
   onJoin?: () => void
+  cardSize?: 'sm' | 'md'
 }) {
   const isActive = !!activeHandId && hands.some((h) => h.id === activeHandId)
 
@@ -54,7 +56,7 @@ export function SeatPod({
   }
 
   return (
-    <div className="relative flex w-24 flex-col items-center gap-2 sm:w-28">
+    <div className={cn('relative flex flex-col items-center gap-2', cardSize === 'md' ? 'w-28 sm:w-32' : 'w-24 sm:w-28')}>
       {canRemove && (
         <button
           onClick={onRemove}
@@ -72,7 +74,7 @@ export function SeatPod({
           <div className="flex flex-wrap items-end justify-center gap-1">
             {hands.map((h) => (
               <div key={h.id} className="flex flex-col items-center gap-0.5">
-                <HandView hand={h} isActive={h.id === activeHandId} size="sm" />
+                <HandView hand={h} isActive={h.id === activeHandId} size={cardSize} />
                 {h.bet_amount > 0 && <ChipStack amount={h.bet_amount} size="sm" />}
                 {h.insurance_bet > 0 && (
                   <span className="text-[9px] font-bold text-neon-cyan">ins {formatChips(h.insurance_bet)}</span>

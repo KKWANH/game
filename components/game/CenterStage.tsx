@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { cn } from '@/lib/utils'
+import { cn, formatChips } from '@/lib/utils'
 import type { RoundPhase, RoomStatus } from '@/lib/supabase/types'
 
 /** The middle-of-table focal point: makes the felt feel alive and tells every
@@ -13,6 +13,7 @@ export function CenterStage({
   turnSeconds,
   activePlayerName,
   isMyTurn,
+  resultNet,
 }: {
   status: RoomStatus | null
   phase: RoundPhase | null
@@ -20,6 +21,8 @@ export function CenterStage({
   turnSeconds: number
   activePlayerName: string | null
   isMyTurn: boolean
+  /** Local player's net for the just-finished round (null = not applicable). */
+  resultNet?: number | null
 }) {
   let title = ''
   let subtitle = ''
@@ -47,9 +50,11 @@ export function CenterStage({
     tone = 'dealer'
   } else if (phase === 'settlement' || phase === 'complete') {
     title = '라운드 종료'
-    subtitle = '결과 정산 완료'
+    subtitle = resultNet == null ? '결과 정산 완료' : ''
     tone = 'done'
   }
+
+  const showResult = (phase === 'complete' || phase === 'settlement') && resultNet != null
 
   const showTimer = (phase === 'player_turns' || phase === 'betting' || (phase === 'dealer_turn' && isMyTurn)) && secondsLeft !== null
 
@@ -75,6 +80,29 @@ export function CenterStage({
 
       {showTimer && (
         <TimerRing seconds={secondsLeft!} max={turnSeconds} urgent={secondsLeft! <= 5} />
+      )}
+
+      {showResult && (
+        <motion.div
+          key={resultNet}
+          initial={{ scale: 0.5, opacity: 0, y: 6 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 260, damping: 16 }}
+          className="flex flex-col items-center"
+        >
+          <span
+            className={cn(
+              'text-5xl font-black tabular-nums drop-shadow',
+              resultNet! > 0 ? 'text-accent' : resultNet! < 0 ? 'text-destructive' : 'text-muted-foreground'
+            )}
+          >
+            {resultNet! > 0 ? '+' : ''}
+            {formatChips(resultNet!)}
+          </span>
+          <span className="text-sm font-semibold text-muted-foreground">
+            {resultNet! > 0 ? '획득 🎉' : resultNet! < 0 ? '잃음' : '무승부'}
+          </span>
+        </motion.div>
       )}
     </div>
   )
