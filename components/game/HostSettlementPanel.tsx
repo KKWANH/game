@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -60,10 +61,15 @@ export function HostSettlementPanel({
 
   const nets = standings ? [...standings.netBySeat].sort((a, b) => b.net - a.net) : []
 
-  return (
+  // Portal to <body> so the modal escapes the fixed host-dock stacking context.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  if (!mounted) return null
+
+  return createPortal(
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -196,7 +202,8 @@ export function HostSettlementPanel({
           </Button>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
 

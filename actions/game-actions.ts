@@ -132,10 +132,21 @@ export async function placeBet(input: z.input<typeof BetSchema>) {
   return { ok: true }
 }
 
-/** Host deals once at least one bet is in. Transitions betting -> player_turns. */
-export async function deal(roundId: string) {
+/** Host deals once at least one bet is in. Transitions betting -> player_turns.
+ *  Takes the ROOM id (like the other host actions) and resolves its live round. */
+export async function deal(roomId: string) {
   const user = await requireUser()
   const service = createServiceClient()
+
+  const { data: room } = await service
+    .from('rooms')
+    .select('current_round_id, host_user_id')
+    .eq('id', roomId)
+    .single()
+  if (!room?.current_round_id) throw new Error('진행 중인 라운드가 없습니다.')
+  if (room.host_user_id !== user.id) throw new Error('호스트만 딜할 수 있습니다.')
+
+  const roundId = room.current_round_id
   const state = await loadRoundState(service, roundId)
 
   if (state.room.host_user_id !== user.id) throw new Error('호스트만 딜할 수 있습니다.')

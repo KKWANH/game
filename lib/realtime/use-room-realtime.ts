@@ -26,6 +26,8 @@ export function useRoomRealtime(roomId: string, meId: string | null) {
   useEffect(() => {
     const supabase = createClient()
     let active = true
+    let channel: RealtimeChannel | null = null
+    let poll: ReturnType<typeof setInterval> | null = null
 
     const reload = () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -40,33 +42,49 @@ export function useRoomRealtime(roomId: string, meId: string | null) {
       if (active) setSnapshot(snap)
     })
 
-    const filter = `room_id=eq.${roomId}`
-    const channel: RealtimeChannel = supabase
-      .channel(`room:${roomId}`, { config: { presence: { key: meId ?? 'anon' } } })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, reload)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'seats', filter }, reload)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'game_rounds', filter }, reload)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chip_ledger', filter }, reload)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'settlements', filter }, reload)
-      // hands / hand_cards aren't room_id-filtered; listen unfiltered and reload.
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'hands' }, reload)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'hand_cards' }, reload)
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState()
-        const ids = Object.keys(state)
-        setPresent(ids)
-      })
-      .subscribe(async (status) => {
-        setConnected(status === 'SUBSCRIBED')
-        if (status === 'SUBSCRIBED' && meId) {
-          await channel.track({ user_id: meId, at: Date.now() })
-        }
-      })
+    ;(async () => {
+      // CRITICAL: authorize the realtime socket with the user's JWT, otherwise
+      // RLS (is_room_member via auth.uid()) silently drops every change event.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        await supabase.realtime.setAuth(session.access_token)
+      }
+      if (!active) return
+
+      const filter = `room_id=eq.${roomId}`
+      channel = supabase
+        .channel(`room:${roomId}`, { config: { presence: { key: meId ?? 'anon' } } })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, reload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'seats', filter }, reload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'game_rounds', filter }, reload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'chip_ledger', filter }, reload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'settlements', filter }, reload)
+        // hands / hand_cards aren't room_id-filtered; listen unfiltered and reload.
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'hands' }, reload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'hand_cards' }, reload)
+        .on('presence', { event: 'sync' }, () => {
+          const ids = Object.keys(channel?.presenceState() ?? {})
+          setPresent(ids)
+        })
+        .subscribe(async (status) => {
+          setConnected(status === 'SUBSCRIBED')
+          if (status === 'SUBSCRIBED' && meId) {
+            await channel?.track({ user_id: meId, at: Date.now() })
+          }
+        })
+    })()
+
+    // Safety-net poll: realtime is primary, but a light refetch guarantees the
+    // board converges even if a change event is missed or the socket drops.
+    poll = setInterval(reload, 3500)
 
     return () => {
       active = false
       if (debounceRef.current) clearTimeout(debounceRef.current)
-      supabase.removeChannel(channel)
+      if (poll) clearInterval(poll)
+      if (channel) supabase.removeChannel(channel)
     }
   }, [roomId, meId, setSnapshot, setConnected, setPresent])
 }
