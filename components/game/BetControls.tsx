@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ChipButton, ChipStack } from '@/components/chips/ChipStack'
@@ -29,6 +29,37 @@ export function BetControls({
     setAmount((a) => Math.min(config.max_bet, seat.chip_stack, a + q))
   }
   const canConfirm = amount >= config.min_bet && amount <= seat.chip_stack
+
+  // Keyboard betting: 1–5 add chips, Enter confirms, P passes, Esc clears.
+  const live = useRef<{ amount: number; canConfirm: boolean; pending: boolean }>(null!)
+  live.current = { amount, canConfirm, pending }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const { amount, canConfirm, pending } = live.current
+      if (pending) return
+      const k = e.key.toLowerCase()
+      const denomIdx = ['1', '2', '3', '4', '5'].indexOf(e.key)
+      if (denomIdx >= 0 && DENOMS[denomIdx] <= config.max_bet) {
+        e.preventDefault()
+        add(DENOMS[denomIdx])
+      } else if (e.key === 'Enter' && canConfirm) {
+        e.preventDefault()
+        go(amount)
+      } else if (k === 'p') {
+        e.preventDefault()
+        go(0)
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        setAmount(0)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function go(betAmount: number) {
     setPending(true)
@@ -76,10 +107,10 @@ export function BetControls({
           초기화
         </Button>
         <Button size="lg" variant="ghost" disabled={pending} onClick={() => go(0)}>
-          패스
+          패스 <kbd className="ml-1 opacity-60">P</kbd>
         </Button>
         <Button variant="gold" size="lg" className="flex-1" disabled={pending || !canConfirm} onClick={() => go(amount)}>
-          베팅 확정
+          베팅 확정 <kbd className="ml-1 opacity-60">⏎</kbd>
         </Button>
       </div>
     </div>

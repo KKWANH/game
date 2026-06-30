@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { playerAction } from '@/actions/game-actions'
@@ -23,6 +23,16 @@ const LABELS: Record<Action, string> = {
   split: '스플릿',
   surrender: '서렌더',
   insurance: '인슈어런스',
+}
+
+// Keyboard shortcuts so a round can be played without the mouse.
+const KEYS: Record<Action, string> = {
+  hit: 'h',
+  stand: 's',
+  double: 'd',
+  split: 'p',
+  surrender: 'r',
+  insurance: 'i',
 }
 
 export function ActionBar({
@@ -75,13 +85,35 @@ export function ActionBar({
     }
   }
 
+  // Keyboard play — read live state via a ref so we register the listener once.
+  const live = useRef<{ act: (a: Action) => void; actions: Action[]; pending: Action | null; showInsurance: boolean }>(null!)
+  live.current = { act, actions, pending, showInsurance }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const { act, actions, pending, showInsurance } = live.current
+      if (pending) return
+      const entry = (Object.entries(KEYS) as [Action, string][]).find(([, k]) => k === e.key.toLowerCase())
+      if (!entry) return
+      const a = entry[0]
+      if (a === 'insurance' ? showInsurance : actions.includes(a)) {
+        e.preventDefault()
+        act(a)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   const order: Action[] = ['hit', 'stand', 'double', 'split', 'surrender']
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-2">
       {showInsurance && (
         <Button variant="gold" size="lg" disabled={pending !== null} onClick={() => act('insurance')}>
-          {LABELS.insurance}
+          {LABELS.insurance} <kbd className="ml-1 opacity-60">I</kbd>
         </Button>
       )}
       {order
@@ -94,7 +126,7 @@ export function ActionBar({
             disabled={pending !== null}
             onClick={() => act(a)}
           >
-            {LABELS[a]}
+            {LABELS[a]} <kbd className="ml-1 opacity-60">{KEYS[a].toUpperCase()}</kbd>
           </Button>
         ))}
     </div>
