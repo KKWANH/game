@@ -19,12 +19,12 @@ export function BetControls({
   seat: SeatRow
   config: RoomConfigRow
 }) {
-  const [amount, setAmount] = useState(config.min_bet)
+  // Build the bet up from 0 — clicking a 100 chip means exactly 100.
+  const [amount, setAmount] = useState(0)
   const [pending, setPending] = useState(false)
 
-  const clamp = (n: number) => Math.min(config.max_bet, Math.max(config.min_bet, n))
-  // Stack chips onto the bet, but never exceed the max or what you can afford.
   const add = (q: number) => setAmount((a) => Math.min(config.max_bet, seat.chip_stack, a + q))
+  const canConfirm = amount >= config.min_bet && amount <= seat.chip_stack
 
   async function go(betAmount: number) {
     setPending(true)
@@ -38,7 +38,6 @@ export function BetControls({
       setPending(false)
     }
   }
-  const submit = () => go(clamp(amount))
 
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border border-gold/20 bg-card/85 p-4 shadow-xl backdrop-blur">
@@ -47,11 +46,16 @@ export function BetControls({
         <span className="font-bold text-gold">{formatChips(seat.chip_stack)}</span>
       </div>
 
-      {/* Current bet as a chip stack */}
-      <div className="flex min-h-[56px] items-end gap-3">
-        <ChipStack amount={clamp(amount)} size="md" label={false} />
-        <span className="pb-1 text-3xl font-black tabular-nums text-gold">{formatChips(clamp(amount))}</span>
-      </div>
+      {/* Current bet (built up from 0) */}
+      <button
+        type="button"
+        onClick={() => setAmount(0)}
+        title="눌러서 초기화"
+        className="flex min-h-[56px] items-end gap-3"
+      >
+        <ChipStack amount={amount} size="md" label={false} />
+        <span className="pb-1 text-3xl font-black tabular-nums text-gold">{formatChips(amount)}</span>
+      </button>
 
       {/* Chip denominations to stack */}
       <div className="flex items-center justify-center gap-2">
@@ -61,10 +65,13 @@ export function BetControls({
       </div>
 
       <div className="flex w-full items-center gap-2">
+        <Button size="lg" variant="ghost" disabled={pending} onClick={() => setAmount(0)}>
+          초기화
+        </Button>
         <Button size="lg" variant="ghost" disabled={pending} onClick={() => go(0)}>
           패스
         </Button>
-        <Button variant="gold" size="lg" className="flex-1" disabled={pending} onClick={submit}>
+        <Button variant="gold" size="lg" className="flex-1" disabled={pending || !canConfirm} onClick={() => go(amount)}>
           베팅 확정
         </Button>
       </div>
