@@ -4,7 +4,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireUser } from '@/lib/game/auth'
 import { minCashFlow, SeatNet } from '@/lib/settlement/min-cash-flow'
 import { redistributeAiNet } from '@/lib/settlement/ai-redistribute'
-import type { SeatRow } from '@/lib/supabase/types'
+import { DEFAULT_MONEY, type MoneyConfig } from '@/lib/money'
+import type { RoomRow, SeatRow } from '@/lib/supabase/types'
 
 export interface Standing {
   seatId: string
@@ -24,8 +25,18 @@ export interface SettlementResult {
   transfers: { fromSeat: string; toSeat: string; amount: number }[]
   /** combined net held by AI seats — spread evenly across the human players */
   aiNet: number
-  /** KRW per chip; 0 = chips only (real-money display off) */
-  chipValueKrw: number
+  /** real-money stake (unit_chips coins = unit_amount of currency) */
+  money: MoneyConfig
+}
+
+/** Read a room's real-money stake, defaulting to 1 coin = 1 KRW for rooms that
+ *  predate migration 0008. */
+function moneyFromRoom(room: RoomRow): MoneyConfig {
+  return {
+    currency: room.currency ?? DEFAULT_MONEY.currency,
+    unitChips: room.unit_chips ?? DEFAULT_MONEY.unitChips,
+    unitAmount: room.unit_amount ?? DEFAULT_MONEY.unitAmount,
+  }
 }
 
 /** Compute current standings + (for human dealer) the who-pays-whom transfers.
@@ -36,7 +47,7 @@ export interface SettlementResult {
 function computeStandings(
   seats: SeatRow[],
   dealerType: string,
-  chipValueKrw = 0
+  money: MoneyConfig = DEFAULT_MONEY
 ): SettlementResult {
   const netBySeat: Standing[] = seats.map((s) => {
     const net = s.chip_stack - s.total_buy_in
@@ -63,7 +74,7 @@ function computeStandings(
       .map((n) => ({ seatId: n.seatId, net: n.settleNet }))
     transfers = minCashFlow(nets)
   }
-  return { netBySeat, transfers, aiNet, chipValueKrw }
+  return { netBySeat, transfers, aiNet, money }
 }
 
 async function loadHostRoom(roomId: string, userId: string) {
@@ -84,9 +95,9 @@ async function activeSeats(service: ReturnType<typeof createServiceClient>, room
   return seats
 }
 
-/** Insert a settlement row, gracefully degrading if migration 0007 (kind /
- *  chip_value_krw) hasn't been applied yet — never break the final-settlement
- *  path over a not-yet-applied column. */
+/** Insert a settlement row, gracefully degrading if migrations 0007/0008 (kind,
+ *  currency, …) haven't been applied yet — never break the final-settlement path
+ *  over a not-yet-applied column. */
 async function insertSettlement(
   service: ReturnType<typeof createServiceClient>,
   row: {
@@ -94,13 +105,15 @@ async function insertSettlement(
     net_by_seat: SettlementResult['netBySeat']
     transfers: SettlementResult['transfers']
     kind: 'interim' | 'final'
-    chip_value_krw: number
+    currency: string
+    unit_chips: number
+    unit_amount: number
   }
 ) {
   const full = await service.from('settlements').insert(row).select('*').single()
   if (!full.error) return full.data
-  // Likely the 0007 columns don't exist yet — retry with the original shape.
-  const { kind: _kind, chip_value_krw: _v, ...legacy } = row
+  // Likely the 0007/0008 columns don't exist yet — retry with the base shape.
+  const { kind: _k, currency: _c, unit_chips: _uc, unit_amount: _ua, ...legacy } = row
   const { data, error } = await service.from('settlements').insert(legacy).select('*').single()
   if (error) throw new Error('정산 저장 실패: ' + error.message)
   return data
@@ -111,7 +124,7 @@ export async function interimSettlement(roomId: string): Promise<SettlementResul
   const user = await requireUser()
   const { service, room } = await loadHostRoom(roomId, user.id)
   const seats = await activeSeats(service, roomId)
-  return computeStandings(seats, room.dealer_type, room.chip_value_krw ?? 0)
+  return computeStandings(seats, room.dealer_type, moneyFromRoom(room))
 }
 
 /** Record a mid-game settlement so "중간 정산 완료" is visible to everyone —
@@ -121,25 +134,35 @@ export async function recordInterimSettlement(roomId: string): Promise<Settlemen
   const { service, room } = await loadHostRoom(roomId, user.id)
   await assertBetweenRounds(service, room.current_round_id)
   const seats = await activeSeats(service, roomId)
-  const result = computeStandings(seats, room.dealer_type, room.chip_value_krw ?? 0)
+  const result = computeStandings(seats, room.dealer_type, moneyFromRoom(room))
   await insertSettlement(service, {
     room_id: roomId,
     net_by_seat: result.netBySeat,
     transfers: result.transfers,
     kind: 'interim',
-    chip_value_krw: result.chipValueKrw,
+    currency: result.money.currency,
+    unit_chips: result.money.unitChips,
+    unit_amount: result.money.unitAmount,
   })
   return result
 }
 
-/** Host sets the real-money value of one chip (KRW). 0 turns the display off. */
-export async function setChipValue(roomId: string, krw: number) {
+/** Host sets the room's real-money stake: unit_chips coins = unit_amount of currency. */
+export async function setRoomMoney(
+  roomId: string,
+  money: { currency: string; unitChips: number; unitAmount: number }
+) {
   const user = await requireUser()
   const { service } = await loadHostRoom(roomId, user.id)
-  const value = Math.max(0, Math.floor(krw))
-  const { error } = await service.from('rooms').update({ chip_value_krw: value }).eq('id', roomId)
-  if (error) throw new Error('칩 가치 설정 실패 — 마이그레이션 0007을 먼저 적용하세요. (' + error.message + ')')
-  return { ok: true, chipValueKrw: value }
+  const currency = (money.currency || 'KRW').slice(0, 3).toUpperCase()
+  const unit_chips = Math.max(1, Math.floor(money.unitChips || 1))
+  const unit_amount = Math.max(0, money.unitAmount || 0)
+  const { error } = await service
+    .from('rooms')
+    .update({ currency, unit_chips, unit_amount })
+    .eq('id', roomId)
+  if (error) throw new Error('화폐 설정 실패 — 마이그레이션 0008을 먼저 적용하세요. (' + error.message + ')')
+  return { ok: true, currency, unitChips: unit_chips, unitAmount: unit_amount }
 }
 
 export interface SeatLedger {
@@ -181,14 +204,16 @@ export async function computeSettlement(roomId: string) {
   const user = await requireUser()
   const { service, room } = await loadHostRoom(roomId, user.id)
   const seats = await activeSeats(service, roomId)
-  const result = computeStandings(seats, room.dealer_type, room.chip_value_krw ?? 0)
+  const result = computeStandings(seats, room.dealer_type, moneyFromRoom(room))
 
   const settlement = await insertSettlement(service, {
     room_id: roomId,
     net_by_seat: result.netBySeat,
     transfers: result.transfers,
     kind: 'final',
-    chip_value_krw: result.chipValueKrw,
+    currency: result.money.currency,
+    unit_chips: result.money.unitChips,
+    unit_amount: result.money.unitAmount,
   })
 
   await service.from('rooms').update({ status: 'settled' }).eq('id', roomId)

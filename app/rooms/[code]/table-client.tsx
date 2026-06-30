@@ -18,7 +18,8 @@ import { SettlementScreen } from '@/components/settlement/SettlementScreen'
 import { HostSettlementPanel } from '@/components/game/HostSettlementPanel'
 import { startRound, aiAct } from '@/actions/game-actions'
 import { takeSeat, buyIn, addAiSeat, removeSeat } from '@/actions/room-actions'
-import { formatChips, formatWon } from '@/lib/utils'
+import { formatChips } from '@/lib/utils'
+import { formatMoney, DEFAULT_MONEY, type MoneyConfig } from '@/lib/money'
 import type { Card, Rank, Suit } from '@/lib/blackjack'
 import type { SettlementRow } from '@/lib/supabase/types'
 
@@ -311,7 +312,12 @@ function Header({
 
 /** Persistent bar shown to everyone after the host records a 중간정산. */
 function InterimBanner({ settlement, mySeatId }: { settlement: SettlementRow; mySeatId: string | null }) {
-  const krw = settlement.chip_value_krw ?? 0
+  const money: MoneyConfig =
+    settlement.currency != null
+      ? { currency: settlement.currency, unitChips: settlement.unit_chips ?? 1, unitAmount: settlement.unit_amount ?? 1 }
+      : settlement.chip_value_krw && settlement.chip_value_krw > 0
+        ? { currency: 'KRW', unitChips: 1, unitAmount: settlement.chip_value_krw }
+        : DEFAULT_MONEY
   const mine = settlement.net_by_seat.find((n) => n.seatId === mySeatId)
   const time = (() => {
     try {
@@ -326,7 +332,7 @@ function InterimBanner({ settlement, mySeatId }: { settlement: SettlementRow; my
   const owed = settlement.transfers
     .filter((t) => t.toSeat === mySeatId)
     .map((t) => settlement.net_by_seat.find((n) => n.seatId === t.fromSeat)?.displayName)
-  const amount = (chips: number) => (krw > 0 ? formatWon(chips, krw) : `${formatChips(chips)}칩`)
+  const amount = (chips: number) => formatMoney(chips, money)
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 border-y border-gold/30 bg-gold/10 px-4 py-1.5 text-center text-xs">

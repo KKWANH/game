@@ -2,15 +2,28 @@
 
 import { motion } from 'framer-motion'
 import { Panel } from '@/components/ui/input'
-import { formatChips, formatWon, cn } from '@/lib/utils'
+import { formatChips, cn } from '@/lib/utils'
+import { formatMoney, describeStake, DEFAULT_MONEY, type MoneyConfig } from '@/lib/money'
 import type { SettlementRow } from '@/lib/supabase/types'
+
+/** Reconstruct the stake from a stored settlement, tolerating older rows that
+ *  predate 0008 (chip_value_krw) or 0007 (nothing → default 1코인 = 1원). */
+function moneyFromSettlement(s: SettlementRow): MoneyConfig {
+  if (s.currency != null) {
+    return { currency: s.currency, unitChips: s.unit_chips ?? 1, unitAmount: s.unit_amount ?? 1 }
+  }
+  if (s.chip_value_krw && s.chip_value_krw > 0) {
+    return { currency: 'KRW', unitChips: 1, unitAmount: s.chip_value_krw }
+  }
+  return DEFAULT_MONEY
+}
 
 export function SettlementScreen({ settlement }: { settlement: SettlementRow }) {
   const nets = [...settlement.net_by_seat].sort((a, b) => b.net - a.net)
   const aiNet =
     settlement.aiNet ?? nets.filter((n) => n.isAi).reduce((s, n) => s + n.net, 0)
   const humanCount = nets.filter((n) => !n.isAi).length
-  const krw = settlement.chip_value_krw ?? 0
+  const money = moneyFromSettlement(settlement)
 
   return (
     <motion.div
@@ -21,9 +34,7 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
       <h1 className="text-center text-3xl font-extrabold">
         <span className="shimmer-gold">최종 정산</span>
       </h1>
-      {krw > 0 && (
-        <p className="-mt-4 text-center text-sm text-gold">1칩 = {formatChips(krw)}원 기준</p>
-      )}
+      <p className="-mt-4 text-center text-sm text-gold">{describeStake(money)} 기준</p>
 
       <Panel className="divide-y divide-border">
         {nets.map((n) => (
@@ -49,14 +60,12 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
             >
               <div className="text-xl font-extrabold">
                 {n.net > 0 ? '+' : ''}
-                {formatChips(n.net)}
+                {formatMoney(n.net, money)}
               </div>
-              {krw > 0 && (
-                <div className="text-sm font-semibold opacity-90">
-                  {n.net > 0 ? '+' : ''}
-                  {formatWon(n.net, krw)}
-                </div>
-              )}
+              <div className="text-xs font-medium opacity-70">
+                {n.net > 0 ? '+' : ''}
+                {formatChips(n.net)}코인
+              </div>
             </div>
           </div>
         ))}
@@ -65,7 +74,7 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
       {aiNet !== 0 && humanCount > 0 && (
         <p className="rounded-xl bg-neon-cyan/10 px-4 py-3 text-center text-sm leading-relaxed text-neon-cyan">
           🤖 AI 손익 {aiNet > 0 ? '+' : ''}
-          {formatChips(aiNet)}은(는) 실제 사람이 아니므로 사람 {humanCount}명에게 공평하게 나눠
+          {formatChips(aiNet)}코인은(는) 실제 사람이 아니므로 사람 {humanCount}명에게 공평하게 나눠
           아래 송금에 반영했습니다.
         </p>
       )}
@@ -84,10 +93,8 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
                   <span className="font-semibold text-accent">{to?.displayName}</span>
                 </span>
                 <span className="font-bold tabular-nums text-gold">
-                  {krw > 0 ? formatWon(t.amount, krw) : formatChips(t.amount)}
-                  {krw > 0 && (
-                    <span className="ml-1 text-xs font-normal opacity-60">({formatChips(t.amount)}칩)</span>
-                  )}
+                  {formatMoney(t.amount, money)}
+                  <span className="ml-1 text-xs font-normal opacity-60">({formatChips(t.amount)}코인)</span>
                 </span>
               </div>
             )

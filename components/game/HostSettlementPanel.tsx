@@ -6,11 +6,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
-import { formatChips, formatWon, cn } from '@/lib/utils'
+import { formatChips, cn } from '@/lib/utils'
+import { formatMoney, describeStake, CURRENCIES } from '@/lib/money'
 import {
   interimSettlement,
   recordInterimSettlement,
-  setChipValue,
+  setRoomMoney,
   roomLedgerSummary,
   transferChips,
   rebalanceChips,
@@ -62,21 +63,25 @@ export function HostSettlementPanel({
   const [toSeat, setToSeat] = useState('')
   const [amount, setAmount] = useState(100)
   const [target, setTarget] = useState(1000)
-  const [rate, setRate] = useState(0)
-  const [rateSynced, setRateSynced] = useState(false)
+  const [currency, setCurrency] = useState('KRW')
+  const [unitChips, setUnitChips] = useState(1)
+  const [unitAmount, setUnitAmount] = useState(1)
+  const [moneySynced, setMoneySynced] = useState(false)
   const [ledger, setLedger] = useState<SeatLedger[] | null>(null)
 
   const nets = standings ? [...standings.netBySeat].sort((a, b) => b.net - a.net) : []
-  const krw = standings?.chipValueKrw ?? 0
-  const won = (chips: number) => formatWon(chips, krw)
+  const money = standings?.money ?? { currency: 'KRW', unitChips: 1, unitAmount: 1 }
+  const won = (chips: number) => formatMoney(chips, money)
 
-  // Seed the rate input once from the loaded room value.
+  // Seed the stake inputs once from the loaded room value.
   useEffect(() => {
-    if (standings && !rateSynced) {
-      setRate(standings.chipValueKrw)
-      setRateSynced(true)
+    if (standings && !moneySynced) {
+      setCurrency(standings.money.currency)
+      setUnitChips(standings.money.unitChips)
+      setUnitAmount(standings.money.unitAmount)
+      setMoneySynced(true)
     }
-  }, [standings, rateSynced])
+  }, [standings, moneySynced])
 
   const toggleLedger = async () => {
     if (ledger) return setLedger(null)
@@ -117,35 +122,59 @@ export function HostSettlementPanel({
             </Button>
           </div>
 
-          {/* Real-money stake: 1 chip = N KRW. 0 = chips only. */}
-          <div className="mb-4 flex flex-wrap items-end gap-2 rounded-2xl border border-gold/30 bg-gold/5 p-3">
-            <div className="space-y-1">
-              <Label>현실 머니 — 1칩 가치 (원)</Label>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm text-muted-foreground">1칩 =</span>
-                <Input
-                  type="number"
-                  className="w-24"
-                  value={rate}
-                  min={0}
-                  onChange={(e) => setRate(Number(e.target.value))}
-                />
-                <span className="text-sm text-muted-foreground">원</span>
-              </div>
+          {/* Real-money stake: unit_chips coins = unit_amount of currency. */}
+          <div className="mb-4 space-y-2 rounded-2xl border border-gold/30 bg-gold/5 p-3">
+            <div className="flex items-center justify-between">
+              <Label>현실 머니 — 코인 환율</Label>
+              <span className="text-xs text-gold">현재 {describeStake(money)}</span>
             </div>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={busy || rate === krw}
-              onClick={() => run(() => setChipValue(roomId, rate), rate > 0 ? `1칩 = ${rate}원 적용` : '현실 머니 끔')}
-            >
-              적용
-            </Button>
-            {krw > 0 && (
-              <span className="ml-auto text-xs text-gold">
-                현재 1칩 = {formatChips(krw)}원 · 정산이 원으로 표시됩니다
-              </span>
-            )}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Input
+                type="number"
+                className="w-20"
+                value={unitChips}
+                min={1}
+                onChange={(e) => setUnitChips(Number(e.target.value))}
+              />
+              <span className="text-sm text-muted-foreground">코인 =</span>
+              <Input
+                type="number"
+                className="w-20"
+                value={unitAmount}
+                min={0}
+                step="any"
+                onChange={(e) => setUnitAmount(Number(e.target.value))}
+              />
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="h-9 rounded-lg border border-input bg-background/60 px-2 text-sm"
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={
+                  busy ||
+                  (currency === money.currency &&
+                    unitChips === money.unitChips &&
+                    unitAmount === money.unitAmount)
+                }
+                onClick={() =>
+                  run(
+                    () => setRoomMoney(roomId, { currency, unitChips, unitAmount }),
+                    `환율 적용: ${unitChips}코인 = ${unitAmount} ${currency}`
+                  )
+                }
+              >
+                적용
+              </Button>
+            </div>
           </div>
 
           {/* Standings */}
@@ -171,8 +200,7 @@ export function HostSettlementPanel({
                   </span>
                   <span
                     className={cn(
-                      'text-right font-bold tabular-nums',
-                      krw > 0 ? 'w-24' : 'w-16',
+                      'w-24 text-right font-bold tabular-nums',
                       n.net > 0 ? 'text-accent' : n.net < 0 ? 'text-destructive' : 'text-muted-foreground'
                     )}
                   >
@@ -180,12 +208,10 @@ export function HostSettlementPanel({
                       {n.net > 0 ? '+' : ''}
                       {formatChips(n.net)}
                     </span>
-                    {krw > 0 && (
-                      <span className="block text-[11px] opacity-90">
-                        {n.net > 0 ? '+' : ''}
-                        {won(n.net)}
-                      </span>
-                    )}
+                    <span className="block text-[11px] opacity-90">
+                      {n.net > 0 ? '+' : ''}
+                      {won(n.net)}
+                    </span>
                   </span>
                 </div>
               </div>
@@ -213,12 +239,10 @@ export function HostSettlementPanel({
                       <span className="text-accent">{to?.displayName}</span>
                     </span>
                     <span className="font-bold text-gold">
-                      {krw > 0 ? won(t.amount) : formatChips(t.amount)}
-                      {krw > 0 && (
-                        <span className="ml-1 text-[11px] font-normal opacity-60">
-                          ({formatChips(t.amount)})
-                        </span>
-                      )}
+                      {won(t.amount)}
+                      <span className="ml-1 text-[11px] font-normal opacity-60">
+                        ({formatChips(t.amount)}코인)
+                      </span>
                     </span>
                   </div>
                 )
@@ -301,7 +325,7 @@ export function HostSettlementPanel({
                           </span>
                         </>
                       )}
-                      {krw > 0 && <span className="ml-1 text-[11px] text-gold">({won(l.buyIn + l.topUps)})</span>}
+                      <span className="ml-1 text-[11px] text-gold">({won(l.buyIn + l.topUps)})</span>
                     </span>
                   </div>
                 ))}

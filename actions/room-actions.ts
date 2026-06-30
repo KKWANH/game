@@ -26,6 +26,9 @@ const CreateRoomSchema = z.object({
   maxSeats: z.coerce.number().int().min(1).max(7).default(6),
   turnTimer: z.coerce.number().int().min(5).max(120).default(30),
   startingChips: z.coerce.number().int().min(0).default(1000),
+  currency: z.string().min(1).max(3).default('KRW'),
+  unitChips: z.coerce.number().int().min(1).default(1),
+  unitAmount: z.coerce.number().min(0).default(1),
 })
 
 export type CreateRoomInput = z.input<typeof CreateRoomSchema>
@@ -50,6 +53,19 @@ export async function createRoom(input: CreateRoomInput) {
     .select('*')
     .single()
   if (roomErr || !room) throw new Error('방 생성 실패: ' + roomErr?.message)
+
+  // Real-money stake (migration 0008). Best-effort so room creation never breaks
+  // if the columns aren't there yet — the stake just defaults to 1코인 = 1원.
+  if (p.currency !== 'KRW' || p.unitChips !== 1 || p.unitAmount !== 1) {
+    await service
+      .from('rooms')
+      .update({
+        currency: p.currency.toUpperCase(),
+        unit_chips: p.unitChips,
+        unit_amount: p.unitAmount,
+      })
+      .eq('id', room.id)
+  }
 
   await service.from('room_config').insert({
     room_id: room.id,

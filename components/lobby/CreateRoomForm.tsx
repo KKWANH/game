@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Panel } from '@/components/ui/input'
+import { CURRENCIES } from '@/lib/money'
 import { createRoom, type CreateRoomInput } from '@/actions/room-actions'
 
 export function CreateRoomForm() {
@@ -23,6 +24,9 @@ export function CreateRoomForm() {
     maxSeats: 6,
     turnTimer: 30,
     startingChips: 1000,
+    currency: 'KRW',
+    unitChips: 1,
+    unitAmount: 1,
   })
 
   const set = <K extends keyof CreateRoomInput>(k: K, v: CreateRoomInput[K]) =>
@@ -86,30 +90,69 @@ export function CreateRoomForm() {
       </button>
 
       {adv && (
-        <div className="grid grid-cols-2 gap-3 rounded-xl border border-border/60 bg-background/40 p-3 sm:grid-cols-3">
-          <Num label="최소 베팅" value={form.minBet!} onChange={(v) => set('minBet', v)} />
-          <Num label="최대 베팅" value={form.maxBet!} onChange={(v) => set('maxBet', v)} />
-          <Num label="덱 수" value={form.numDecks!} onChange={(v) => set('numDecks', v)} min={1} max={8} />
-          <Num label="턴 제한(초)" value={form.turnTimer!} onChange={(v) => set('turnTimer', v)} min={5} max={120} />
-          <Choice
-            label="블랙잭 배당"
-            value={form.blackjackPayout!}
-            onChange={(v) => set('blackjackPayout', v as '3:2' | '6:5')}
-            options={[
-              { v: '3:2', label: '3:2' },
-              { v: '6:5', label: '6:5' },
-            ]}
-          />
-          <Choice
-            label="딜러 소프트17"
-            value={form.dealerHitsSoft17 ? 'hit' : 'stand'}
-            onChange={(v) => set('dealerHitsSoft17', v === 'hit')}
-            options={[
-              { v: 'stand', label: '스탠드' },
-              { v: 'hit', label: '히트' },
-            ]}
-          />
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-3 rounded-xl border border-border/60 bg-background/40 p-3 sm:grid-cols-3">
+            <Num label="최소 베팅" value={form.minBet!} onChange={(v) => set('minBet', v)} />
+            <Num label="최대 베팅" value={form.maxBet!} onChange={(v) => set('maxBet', v)} />
+            <Num label="덱 수" value={form.numDecks!} onChange={(v) => set('numDecks', v)} min={1} max={8} />
+            <Num label="턴 제한(초)" value={form.turnTimer!} onChange={(v) => set('turnTimer', v)} min={5} max={120} />
+            <Choice
+              label="블랙잭 배당"
+              value={form.blackjackPayout!}
+              onChange={(v) => set('blackjackPayout', v as '3:2' | '6:5')}
+              options={[
+                { v: '3:2', label: '3:2' },
+                { v: '6:5', label: '6:5' },
+              ]}
+            />
+            <Choice
+              label="딜러 소프트17"
+              value={form.dealerHitsSoft17 ? 'hit' : 'stand'}
+              onChange={(v) => set('dealerHitsSoft17', v === 'hit')}
+              options={[
+                { v: 'stand', label: '스탠드' },
+                { v: 'hit', label: '히트' },
+              ]}
+            />
+          </div>
+
+          {/* Real-money stake — default 1코인 = 1원. */}
+          <div className="space-y-1.5 rounded-xl border border-gold/30 bg-gold/5 p-3">
+            <Label>현실 머니 환율 (코인 단위)</Label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Input
+                type="number"
+                className="w-20"
+                min={1}
+                value={form.unitChips!}
+                onChange={(e) => set('unitChips', Number(e.target.value))}
+              />
+              <span className="text-sm text-muted-foreground">코인 =</span>
+              <Input
+                type="number"
+                className="w-20"
+                min={0}
+                step="any"
+                value={form.unitAmount!}
+                onChange={(e) => set('unitAmount', Number(e.target.value))}
+              />
+              <select
+                value={form.currency}
+                onChange={(e) => set('currency', e.target.value)}
+                className="h-9 rounded-lg border border-input bg-background/60 px-2 text-sm"
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              정산 때 이 환율로 실제 금액이 표시됩니다. 나중에 방에서 바꿀 수 있어요.
+            </p>
+          </div>
+        </>
       )}
 
       <Button variant="gold" size="lg" className="w-full" disabled={pending} onClick={submit}>
