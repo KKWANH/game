@@ -16,7 +16,7 @@ const OUTCOME_LABEL: Record<string, string> = {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  busted: 'BUST',
+  busted: 'BUSTED',
   blackjack: 'BLACKJACK!',
   stood: 'STAND',
   surrendered: 'SURRENDER',

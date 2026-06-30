@@ -15,7 +15,7 @@ import { BetControls } from '@/components/game/BetControls'
 import { SettlementScreen } from '@/components/settlement/SettlementScreen'
 import { HostSettlementPanel } from '@/components/game/HostSettlementPanel'
 import { FloatingSuits } from '@/components/effects/FloatingSuits'
-import { startRound, deal, nextRound } from '@/actions/game-actions'
+import { startRound } from '@/actions/game-actions'
 import { takeSeat, buyIn } from '@/actions/room-actions'
 import { formatChips } from '@/lib/utils'
 import type { Card, Rank, Suit } from '@/lib/blackjack'
@@ -32,7 +32,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
   const handsWithCards = useRoomStore((s) => s.handsWithCards)
   const mySeat = useRoomStore((s) => s.mySeat)()
 
-  const secondsLeft = useTurnTimer(round?.id ?? null, round?.turn_deadline ?? null, round?.phase ?? null)
+  const secondsLeft = useTurnTimer(round?.id ?? null, roomId, round?.turn_deadline ?? null, round?.phase ?? null)
   const [panelOpen, setPanelOpen] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -51,13 +51,11 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
 
   const myHands = mySeat ? hands.filter((h) => h.seat_id === mySeat.id && !h.is_dealer) : []
   const myActiveHand = myHands.find((h) => h.id === activeHandId) ?? null
-  const myBetHand = myHands[0] ?? null
 
   const activeSeat = seats.find((s) => hands.some((h) => h.id === activeHandId && h.seat_id === s.id))
   const isMyTurn = !!myActiveHand
   const insuranceOffered =
     round?.phase === 'player_turns' && !!config?.allow_insurance && dealerUpcard?.rank === 'A'
-  const hasBets = hands.some((h) => !h.is_dealer && h.bet_amount > 0)
 
   const run = async (key: string, fn: () => Promise<unknown>) => {
     setBusy(key)
@@ -153,8 +151,8 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
             splitCount={myHands.length}
             insuranceOffered={!!insuranceOffered}
           />
-        ) : round?.phase === 'betting' && !mySeat.is_dealer ? (
-          <BetControls roundId={round.id} seat={mySeat} config={config!} currentBet={myBetHand?.bet_amount ?? 0} />
+        ) : round?.phase === 'betting' && myActiveHand && !mySeat.is_dealer ? (
+          <BetControls roundId={round.id} seat={mySeat} config={config!} />
         ) : (
           <WaitingHint
             phase={round?.phase ?? null}
@@ -175,14 +173,11 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
             <>
               <span className="mx-1 h-4 w-px bg-border" />
               <span className="text-xs font-bold uppercase tracking-widest text-gold">호스트</span>
-              {(room?.status === 'lobby' || round?.phase === 'complete' || round?.phase == null) && (
-                <Button size="sm" variant="gold" disabled={busy !== null} onClick={() => run('start', () => (round?.phase === 'complete' ? nextRound(roomId) : startRound(roomId)))}>
-                  {round?.phase === 'complete' ? '다음 라운드' : '라운드 시작'}
-                </Button>
-              )}
-              {round?.phase === 'betting' && (
-                <Button size="sm" variant="primary" disabled={busy !== null || !hasBets} onClick={() => run('deal', () => deal(roomId))}>
-                  딜 시작
+              {(room?.status === 'lobby' ||
+                (room?.status === 'active' && !round) ||
+                (round?.phase === 'complete' && !round?.dealer_hand_id)) && (
+                <Button size="sm" variant="gold" disabled={busy !== null} onClick={() => run('start', () => startRound(roomId))}>
+                  게임 시작
                 </Button>
               )}
               <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => setPanelOpen(true)}>
@@ -252,11 +247,12 @@ function WaitingHint({
   activeName: string | null
 }) {
   let msg = '대기 중…'
-  if (status === 'lobby' || !phase) msg = '호스트가 라운드를 시작하기를 기다리는 중'
-  else if (phase === 'betting') msg = '딜러는 베팅하지 않습니다 — 딜을 기다리세요'
+  if (status === 'lobby' || !phase) msg = '호스트가 게임을 시작하기를 기다리는 중'
+  else if (phase === 'betting') msg = `${activeName ?? '다른 플레이어'} 베팅 중 — 곧 차례가 와요`
+  else if (phase === 'dealing') msg = '카드 분배 중…'
   else if (phase === 'player_turns') msg = isMyTurn ? '' : `${activeName ?? '다른 플레이어'}의 차례를 기다리는 중`
   else if (phase === 'dealer_turn') msg = '딜러가 카드를 받는 중…'
-  else if (phase === 'complete' || phase === 'settlement') msg = '라운드 종료 — 다음 라운드를 기다리는 중'
+  else if (phase === 'complete' || phase === 'settlement') msg = '라운드 종료 — 다음 판 준비 중…'
   if (!msg) return null
   return (
     <div className="flex items-center gap-2 text-sm text-muted-foreground">

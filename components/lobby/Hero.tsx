@@ -1,7 +1,4 @@
-// Pure-CSS animated hero (framer mount animations are unreliable for client
-// islands rendered by the server-component lobby, so we avoid them here).
-
-import { JokerCard } from './JokerCard'
+// Lobby hero — the 🃏 emoji over a few chips. (No hand-made artwork.)
 
 function Chip({ color, x }: { color: string; x: number }) {
   return (
@@ -14,16 +11,15 @@ function Chip({ color, x }: { color: string; x: number }) {
   )
 }
 
-/** Blackjack hero — a Joker card mascot over a few chips. */
 export function Hero() {
   return (
-    <div className="relative h-44 w-72 sm:h-52 sm:w-80" aria-hidden>
-      <div className="absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--gold)_38%,transparent),transparent)] blur-xl" />
-      <Chip color="var(--chip-red)" x={-96} />
-      <Chip color="var(--chip-green)" x={96} />
-      <Chip color="var(--chip-blue)" x={76} />
-      <div className="absolute left-1/2 top-0 -translate-x-1/2 animate-[heroFloat_4s_ease-in-out_infinite]">
-        <JokerCard className="h-40 w-auto drop-shadow-[0_12px_28px_rgba(0,0,0,0.5)] sm:h-48" />
+    <div className="relative flex h-40 w-72 items-center justify-center sm:h-44 sm:w-80" aria-hidden>
+      <div className="absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--gold)_36%,transparent),transparent)] blur-xl" />
+      <Chip color="var(--chip-red)" x={-100} />
+      <Chip color="var(--chip-green)" x={100} />
+      <Chip color="var(--chip-blue)" x={80} />
+      <div className="relative animate-[heroFloat_4s_ease-in-out_infinite] text-8xl drop-shadow-[0_10px_24px_rgba(0,0,0,0.5)] sm:text-9xl">
+        🃏
       </div>
     </div>
   )

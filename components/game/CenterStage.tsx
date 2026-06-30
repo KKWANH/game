@@ -27,12 +27,16 @@ export function CenterStage({
 
   if (status === 'lobby' || !phase) {
     title = '대기 중'
-    subtitle = '호스트가 라운드를 시작하면 베팅이 열립니다'
+    subtitle = '호스트가 게임을 시작하면 베팅이 열립니다'
     tone = 'idle'
   } else if (phase === 'betting') {
-    title = '베팅 단계'
-    subtitle = '칩을 걸고 기다리세요'
+    title = isMyTurn ? '베팅하세요!' : `${activePlayerName ?? '플레이어'} 베팅 중`
+    subtitle = isMyTurn ? '칩을 걸거나 패스하세요' : '차례를 기다리는 중…'
     tone = 'bet'
+  } else if (phase === 'dealing') {
+    title = '카드 분배'
+    subtitle = '딜링 중…'
+    tone = 'dealer'
   } else if (phase === 'player_turns') {
     title = isMyTurn ? '당신의 차례!' : `${activePlayerName ?? '플레이어'}의 차례`
     subtitle = isMyTurn ? '행동을 선택하세요' : '기다리는 중…'
@@ -47,7 +51,7 @@ export function CenterStage({
     tone = 'done'
   }
 
-  const showTimer = phase === 'player_turns' && secondsLeft !== null
+  const showTimer = (phase === 'player_turns' || phase === 'betting') && secondsLeft !== null
 
   return (
     <div className="pointer-events-none flex flex-col items-center justify-center gap-3 text-center">
@@ -93,6 +97,7 @@ function TimerRing({ seconds, max, urgent }: { seconds: number; max: number; urg
           strokeWidth="4"
           strokeLinecap="round"
           strokeDasharray={C}
+          initial={false}
           animate={{ strokeDashoffset: C * (1 - pct) }}
           transition={{ duration: 0.25, ease: 'linear' }}
         />

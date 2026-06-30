@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ChipButton, ChipStack } from '@/components/chips/ChipStack'
-import { placeBet } from '@/actions/game-actions'
+import { submitBet } from '@/actions/game-actions'
 import { formatChips } from '@/lib/utils'
 import type { RoomConfigRow, SeatRow } from '@/lib/supabase/types'
 
@@ -14,31 +14,31 @@ export function BetControls({
   roundId,
   seat,
   config,
-  currentBet,
 }: {
   roundId: string
   seat: SeatRow
   config: RoomConfigRow
-  currentBet: number
 }) {
-  const [amount, setAmount] = useState(Math.max(config.min_bet, currentBet))
+  const [amount, setAmount] = useState(config.min_bet)
   const [pending, setPending] = useState(false)
 
   const clamp = (n: number) => Math.min(config.max_bet, Math.max(config.min_bet, n))
   // Stack chips onto the bet, but never exceed the max or what you can afford.
   const add = (q: number) => setAmount((a) => Math.min(config.max_bet, seat.chip_stack, a + q))
 
-  async function submit() {
+  async function go(betAmount: number) {
     setPending(true)
     try {
-      await placeBet({ roundId, seatId: seat.id, amount: clamp(amount) })
-      toast.success(`${formatChips(clamp(amount))} 베팅`)
+      const res = await submitBet({ roundId, seatId: seat.id, amount: betAmount })
+      if (res?.conflict) toast.info('차례가 지났어요.')
+      else if (betAmount > 0) toast.success(`${formatChips(betAmount)} 베팅`)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '베팅 실패')
     } finally {
       setPending(false)
     }
   }
+  const submit = () => go(clamp(amount))
 
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border border-gold/20 bg-card/85 p-4 shadow-xl backdrop-blur">
@@ -61,8 +61,8 @@ export function BetControls({
       </div>
 
       <div className="flex w-full items-center gap-2">
-        <Button size="md" variant="ghost" disabled={pending} onClick={() => setAmount(config.min_bet)}>
-          클리어
+        <Button size="lg" variant="ghost" disabled={pending} onClick={() => go(0)}>
+          패스
         </Button>
         <Button variant="gold" size="lg" className="flex-1" disabled={pending} onClick={submit}>
           베팅 확정
