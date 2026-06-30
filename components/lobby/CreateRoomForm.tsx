@@ -10,8 +10,9 @@ import { createRoom, type CreateRoomInput } from '@/actions/room-actions'
 export function CreateRoomForm() {
   const router = useRouter()
   const [pending, setPending] = useState(false)
+  const [adv, setAdv] = useState(false)
   const [form, setForm] = useState<CreateRoomInput>({
-    name: '우리들의 블랙잭',
+    name: 'Blackjack',
     dealerType: 'ai',
     hostRole: 'player',
     numDecks: 6,
@@ -58,7 +59,7 @@ export function CreateRoomForm() {
             { v: 'human', label: '사람 딜러' },
           ]}
         />
-        {form.dealerType === 'human' ? (
+        {form.dealerType === 'human' && (
           <Choice
             label="내 역할"
             value={form.hostRole}
@@ -68,29 +69,30 @@ export function CreateRoomForm() {
               { v: 'dealer', label: '딜러(뱅크)' },
             ]}
           />
-        ) : (
-          <Choice
-            label="블랙잭 배당"
-            value={form.blackjackPayout!}
-            onChange={(v) => set('blackjackPayout', v as '3:2' | '6:5')}
-            options={[
-              { v: '3:2', label: '3 : 2' },
-              { v: '6:5', label: '6 : 5' },
-            ]}
-          />
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Num label="최소 베팅" value={form.minBet!} onChange={(v) => set('minBet', v)} />
-        <Num label="최대 베팅" value={form.maxBet!} onChange={(v) => set('maxBet', v)} />
-        <Num label="덱 수" value={form.numDecks!} onChange={(v) => set('numDecks', v)} min={1} max={8} />
-        <Num label="최대 인원" value={form.maxSeats!} onChange={(v) => set('maxSeats', v)} min={1} max={7} />
-        <Num label="턴 제한(초)" value={form.turnTimer!} onChange={(v) => set('turnTimer', v)} min={5} max={120} />
+      <div className="grid grid-cols-2 gap-3">
         <Num label="시작 칩" value={form.startingChips!} onChange={(v) => set('startingChips', v)} />
-        {form.dealerType === 'human' && (
+        <Num label="최대 인원" value={form.maxSeats!} onChange={(v) => set('maxSeats', v)} min={1} max={7} />
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setAdv((a) => !a)}
+        className="text-xs font-medium text-muted-foreground transition hover:text-gold"
+      >
+        고급 설정 {adv ? '▴' : '▾'}
+      </button>
+
+      {adv && (
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-border/60 bg-background/40 p-3 sm:grid-cols-3">
+          <Num label="최소 베팅" value={form.minBet!} onChange={(v) => set('minBet', v)} />
+          <Num label="최대 베팅" value={form.maxBet!} onChange={(v) => set('maxBet', v)} />
+          <Num label="덱 수" value={form.numDecks!} onChange={(v) => set('numDecks', v)} min={1} max={8} />
+          <Num label="턴 제한(초)" value={form.turnTimer!} onChange={(v) => set('turnTimer', v)} min={5} max={120} />
           <Choice
-            label="배당"
+            label="블랙잭 배당"
             value={form.blackjackPayout!}
             onChange={(v) => set('blackjackPayout', v as '3:2' | '6:5')}
             options={[
@@ -98,17 +100,17 @@ export function CreateRoomForm() {
               { v: '6:5', label: '6:5' },
             ]}
           />
-        )}
-        <Choice
-          label="소프트17"
-          value={form.dealerHitsSoft17 ? 'hit' : 'stand'}
-          onChange={(v) => set('dealerHitsSoft17', v === 'hit')}
-          options={[
-            { v: 'stand', label: '스탠드' },
-            { v: 'hit', label: '히트' },
-          ]}
-        />
-      </div>
+          <Choice
+            label="딜러 소프트17"
+            value={form.dealerHitsSoft17 ? 'hit' : 'stand'}
+            onChange={(v) => set('dealerHitsSoft17', v === 'hit')}
+            options={[
+              { v: 'stand', label: '스탠드' },
+              { v: 'hit', label: '히트' },
+            ]}
+          />
+        </div>
+      )}
 
       <Button variant="gold" size="lg" className="w-full" disabled={pending} onClick={submit}>
         방 만들기

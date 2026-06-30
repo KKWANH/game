@@ -22,6 +22,8 @@ const STATUS_LABEL: Record<string, string> = {
   surrendered: 'SURRENDER',
 }
 
+const OVERLAP = { sm: '-space-x-6', md: '-space-x-8', lg: '-space-x-10' }
+
 export function HandView({
   hand,
   isActive,
@@ -32,14 +34,12 @@ export function HandView({
   isActive?: boolean
   /** When true, render a face-down placeholder for the dealer's missing 2nd card. */
   holeFaceDown?: boolean
-  size?: 'sm' | 'md'
+  size?: 'sm' | 'md' | 'lg'
 }) {
   const cards: Card[] = hand.cards.map((c) => ({ rank: c.rank as Rank, suit: c.suit as Suit }))
   const total = cards.length ? handTotal(cards) : null
   const showHole = holeFaceDown && hand.is_dealer && hand.cards.length === 1
-  const badge = hand.outcome
-    ? OUTCOME_LABEL[hand.outcome]
-    : STATUS_LABEL[hand.status]
+  const badge = hand.outcome ? OUTCOME_LABEL[hand.outcome] : STATUS_LABEL[hand.status]
   const won = hand.outcome === 'win' || hand.outcome === 'blackjack'
   const lost = hand.outcome === 'lose' || hand.status === 'busted'
 
@@ -51,13 +51,32 @@ export function HandView({
           : { boxShadow: '0 0 0 0px transparent' }
       }
       className={cn(
-        'relative flex flex-col items-center gap-1 rounded-2xl p-2 transition-all',
+        'relative flex flex-col items-center gap-1.5 rounded-2xl p-2 transition-all',
         isActive && 'glow-gold ring-2 ring-gold',
         lost && 'opacity-70'
       )}
     >
       {won && <WinBurst big={hand.outcome === 'blackjack'} />}
-      <div className="flex -space-x-5 sm:-space-x-6">
+
+      {/* Badge sits above the cards (its own row) — never overlaps them. */}
+      {badge && (
+        <motion.span
+          initial={{ scale: 0.6, y: 4, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          className={cn(
+            'z-10 rounded-full px-3 py-0.5 text-xs font-extrabold tracking-wide shadow-lg',
+            won
+              ? 'bg-gradient-to-r from-gold-bright to-gold text-primary-foreground'
+              : lost
+                ? 'bg-destructive text-destructive-foreground'
+                : 'bg-secondary text-secondary-foreground'
+          )}
+        >
+          {badge}
+        </motion.span>
+      )}
+
+      <div className={cn('flex', OVERLAP[size])}>
         <AnimatePresence>
           {hand.cards.map((c, i) => (
             <PlayingCard key={c.id} rank={c.rank} suit={c.suit} index={i} size={size} />
@@ -69,30 +88,13 @@ export function HandView({
       {total && !showHole && (
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-xs font-bold tabular-nums',
-            total.isBust ? 'bg-destructive text-destructive-foreground' : 'bg-black/40 text-foreground'
+            'rounded-full px-2.5 py-0.5 text-sm font-bold tabular-nums',
+            total.isBust ? 'bg-destructive text-destructive-foreground' : 'bg-black/50 text-foreground'
           )}
         >
           {total.best}
           {total.isSoft && total.best < 21 ? ' soft' : ''}
         </span>
-      )}
-
-      {badge && (
-        <motion.span
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className={cn(
-            'absolute -top-2 left-1/2 -translate-x-1/2 rounded-full px-3 py-0.5 text-xs font-extrabold tracking-wide shadow-lg',
-            hand.outcome === 'win' || hand.outcome === 'blackjack'
-              ? 'bg-gradient-to-r from-gold-bright to-gold text-primary-foreground'
-              : hand.outcome === 'lose' || hand.status === 'busted'
-                ? 'bg-destructive text-destructive-foreground'
-                : 'bg-secondary text-secondary-foreground'
-          )}
-        >
-          {badge}
-        </motion.span>
       )}
     </motion.div>
   )

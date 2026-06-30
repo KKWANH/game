@@ -32,8 +32,8 @@ export function SeatPod({
     // control at the bottom) so empty and occupied seats bottom-align.
     return (
       <div className="flex w-28 flex-col items-center gap-2 sm:w-32">
-        <div className="flex min-h-[88px] items-end justify-center">
-          <div className="h-20 w-14 rounded-lg border border-dashed border-border/30" />
+        <div className="flex min-h-[112px] items-end justify-center">
+          <div className="h-[4.5rem] w-12 rounded-lg border-2 border-dashed border-border/30" />
         </div>
         <button
           disabled={!canJoin}
@@ -52,9 +52,9 @@ export function SeatPod({
   return (
     <div className="flex w-28 flex-col items-center gap-2 sm:w-32">
       {/* Cards */}
-      <div className="flex min-h-[88px] items-end justify-center">
+      <div className="flex min-h-[112px] items-end justify-center">
         {hands.length === 0 ? (
-          <div className="h-20 w-14 rounded-lg border border-dashed border-border/40" />
+          <div className="h-[4.5rem] w-12 rounded-lg border-2 border-dashed border-border/40" />
         ) : (
           <div className="flex flex-wrap items-end justify-center gap-1">
             {hands.map((h) => (

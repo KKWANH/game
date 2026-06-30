@@ -2,55 +2,56 @@
 
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
-
-const SUIT_GLYPH: Record<string, string> = { S: '♠', H: '♥', D: '♦', C: '♣' }
+import { Suit } from './Suit'
 
 export interface PlayingCardProps {
   rank?: string
   suit?: string
   faceDown?: boolean
   index?: number
-  size?: 'sm' | 'md'
+  size?: 'sm' | 'md' | 'lg'
 }
 
-/** A single flashy playing card with a deal-in animation. */
+const SIZES = {
+  sm: { card: 'w-12 h-[4.5rem] rounded-lg', rank: 'text-lg', corner: 'w-2.5', center: 'w-7' },
+  md: { card: 'w-16 h-24 rounded-xl', rank: 'text-2xl', corner: 'w-3.5', center: 'w-9' },
+  lg: { card: 'w-[5.5rem] h-32 rounded-2xl', rank: 'text-3xl', corner: 'w-4', center: 'w-12' },
+}
+
+/** A chunky, Balatro-style playing card with a deal-in animation. */
 export function PlayingCard({ rank, suit, faceDown, index = 0, size = 'md' }: PlayingCardProps) {
   const red = suit === 'H' || suit === 'D'
-  const dims = size === 'sm' ? 'w-10 h-14 text-sm' : 'w-14 h-20 sm:w-16 sm:h-24 text-base'
+  const s = SIZES[size]
 
   return (
     <motion.div
       initial={{ y: -22, scale: 0.92 }}
       animate={{ y: 0, scale: 1 }}
       transition={{ type: 'spring', stiffness: 340, damping: 26, delay: index * 0.06 }}
-      className={cn('relative shrink-0 rounded-lg select-none', dims)}
+      className={cn('relative shrink-0 select-none', s.card)}
     >
       {faceDown ? (
-        <div className="absolute inset-0 rounded-lg border border-gold/40 bg-gradient-to-br from-felt-deep to-background overflow-hidden">
-          <div className="absolute inset-1 rounded-md border border-gold/30 [background:repeating-linear-gradient(45deg,transparent,transparent_4px,color-mix(in_oklch,var(--gold)_25%,transparent)_4px,color-mix(in_oklch,var(--gold)_25%,transparent)_6px)]" />
+        <div className={cn('absolute inset-0 overflow-hidden border-2 border-gold/40 bg-gradient-to-br from-felt to-felt-deep', s.card)}>
+          <div className="absolute inset-1.5 rounded-md border-2 border-gold/30 [background:repeating-linear-gradient(45deg,transparent,transparent_5px,color-mix(in_oklch,var(--gold)_30%,transparent)_5px,color-mix(in_oklch,var(--gold)_30%,transparent)_8px)]" />
+          <div className="absolute inset-0 flex items-center justify-center text-gold/70">
+            <span className="text-xl font-black">♣</span>
+          </div>
         </div>
       ) : (
-        <div className="absolute inset-0 overflow-hidden rounded-lg border border-black/10 bg-gradient-to-br from-white to-neutral-100 text-neutral-900 shadow-md">
-          <div className={cn('absolute top-1 left-1.5 font-bold leading-none', red && 'text-rose-600')}>
-            <div>{rank}</div>
-            <div className="text-xs">{suit ? SUIT_GLYPH[suit] : ''}</div>
+        <div className={cn('absolute inset-0 border border-black/10 bg-gradient-to-br from-white to-neutral-200 shadow-[0_4px_10px_rgba(0,0,0,0.45)]', s.card)}>
+          {/* top-left */}
+          <div className={cn('absolute left-1.5 top-1 flex flex-col items-center leading-none', red ? 'text-rose-600' : 'text-neutral-900')}>
+            <span className={cn('font-black', s.rank)}>{rank}</span>
+            <Suit suit={suit ?? 'S'} className={s.corner} />
           </div>
-          <div
-            className={cn(
-              'absolute inset-0 flex items-center justify-center text-2xl sm:text-3xl',
-              red ? 'text-rose-600' : 'text-neutral-900'
-            )}
-          >
-            {suit ? SUIT_GLYPH[suit] : ''}
+          {/* center */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Suit suit={suit ?? 'S'} className={cn(s.center, 'opacity-95 drop-shadow-sm')} />
           </div>
-          <div
-            className={cn(
-              'absolute bottom-1 right-1.5 font-bold leading-none rotate-180',
-              red && 'text-rose-600'
-            )}
-          >
-            <div>{rank}</div>
-            <div className="text-xs">{suit ? SUIT_GLYPH[suit] : ''}</div>
+          {/* bottom-right (rotated) */}
+          <div className={cn('absolute bottom-1 right-1.5 flex rotate-180 flex-col items-center leading-none', red ? 'text-rose-600' : 'text-neutral-900')}>
+            <span className={cn('font-black', s.rank)}>{rank}</span>
+            <Suit suit={suit ?? 'S'} className={s.corner} />
           </div>
         </div>
       )}

@@ -17,11 +17,11 @@ export function DealerArea({
         Dealer
       </span>
       {dealerHand ? (
-        <HandView hand={dealerHand} holeFaceDown={holeFaceDown} />
+        <HandView hand={dealerHand} holeFaceDown={holeFaceDown} size="lg" />
       ) : (
         <div className="flex gap-2">
-          <div className="h-20 w-14 rounded-lg border border-dashed border-border/50 sm:h-24 sm:w-16" />
-          <div className="h-20 w-14 rounded-lg border border-dashed border-border/50 sm:h-24 sm:w-16" />
+          <div className="h-28 w-[4.5rem] rounded-xl border-2 border-dashed border-border/40" />
+          <div className="h-28 w-[4.5rem] rounded-xl border-2 border-dashed border-border/40" />
         </div>
       )}
     </div>
