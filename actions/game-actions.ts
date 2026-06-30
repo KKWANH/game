@@ -12,6 +12,10 @@ import {
   computeActionPatch,
   computeDealPatch,
   computeDealerSettlePatch,
+  computeDealerRevealPatch,
+  computeDealerHitPatch,
+  computeDealerStandPatch,
+  hasHumanDealer,
   SEAT_ORDER_GAP,
 } from '@/lib/game/engine'
 import type { Action } from '@/lib/blackjack'
@@ -286,14 +290,83 @@ export async function timeoutTurn(roundId: string) {
   return { ok: true }
 }
 
+/** Enter the dealer turn: AI dealer auto-plays & settles; a HUMAN dealer gets
+ *  the hole revealed and their own timed hit/stand turn. */
 async function runDealerSettle(service: Service, roundId: string, dealerHandId: string) {
   const state = await loadRoundState(service, roundId)
   if (state.round.phase !== 'dealer_turn') return
-  const { patch } = computeDealerSettlePatch(state, dealerHandId)
+  const { patch } = hasHumanDealer(state)
+    ? computeDealerRevealPatch(state, dealerHandId)
+    : computeDealerSettlePatch(state, dealerHandId)
   try {
     await commitRound(service, roundId, state.round.version, patch)
   } catch (e) {
     if (e instanceof VersionConflict) return
     throw e
   }
+}
+
+const DealerActionSchema = z.object({
+  roundId: z.string().uuid(),
+  action: z.enum(['hit', 'stand']),
+})
+
+/** A human dealer plays their own hand (hit/stand) during the dealer turn. */
+export async function dealerAction(input: z.input<typeof DealerActionSchema>) {
+  const user = await requireUser()
+  const p = DealerActionSchema.parse(input)
+  const service = createServiceClient()
+  const state = await loadRoundState(service, p.roundId)
+
+  const dealerHandId = state.round.dealer_hand_id
+  if (state.round.phase !== 'dealer_turn' || !dealerHandId) throw new Error('지금은 딜러 차례가 아닙니다.')
+  if (state.round.active_hand_id !== dealerHandId) throw new Error('딜러 차례가 아닙니다.')
+  const dealerSeat = state.seats.find((s) => s.id === state.room.dealer_seat_id)
+  if (!dealerSeat || dealerSeat.user_id !== user.id) throw new Error('딜러만 조작할 수 있습니다.')
+
+  if (p.action === 'stand') {
+    const { patch } = computeDealerStandPatch(state, dealerHandId)
+    try {
+      await commitRound(service, p.roundId, state.round.version, patch)
+    } catch (e) {
+      if (e instanceof VersionConflict) return { conflict: true }
+      throw e
+    }
+    return { ok: true }
+  }
+
+  // hit
+  const { patch, bust } = computeDealerHitPatch(state, dealerHandId)
+  try {
+    await commitRound(service, p.roundId, state.round.version, patch)
+  } catch (e) {
+    if (e instanceof VersionConflict) return { conflict: true }
+    throw e
+  }
+  if (bust) {
+    const fresh = await loadRoundState(service, p.roundId)
+    if (fresh.round.phase === 'dealer_turn') {
+      const { patch: sp } = computeDealerStandPatch(fresh, dealerHandId)
+      await commitRound(service, p.roundId, fresh.round.version, sp).catch(() => {})
+    }
+  }
+  return { ok: true }
+}
+
+/** Any client fires this if the human dealer's turn deadline passes — auto-stand. */
+export async function dealerTimeout(roundId: string) {
+  await requireUser()
+  const service = createServiceClient()
+  const state = await loadRoundState(service, roundId)
+  const dealerHandId = state.round.dealer_hand_id
+  if (state.round.phase !== 'dealer_turn' || !dealerHandId || state.round.active_hand_id !== dealerHandId) return { ok: true }
+  if (!state.round.turn_deadline || Date.now() < new Date(state.round.turn_deadline).getTime()) return { tooEarly: true }
+  const { patch } = computeDealerStandPatch(state, dealerHandId)
+  try {
+    await commitRound(service, roundId, state.round.version, patch)
+  } catch (e) {
+    if (e instanceof VersionConflict) return { conflict: true }
+    throw e
+  }
+  return { ok: true }
 }

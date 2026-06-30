@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ChipButton, ChipStack } from '@/components/chips/ChipStack'
 import { submitBet } from '@/actions/game-actions'
+import { sound } from '@/lib/sound'
 import { formatChips } from '@/lib/utils'
 import type { RoomConfigRow, SeatRow } from '@/lib/supabase/types'
 
@@ -23,7 +24,10 @@ export function BetControls({
   const [amount, setAmount] = useState(0)
   const [pending, setPending] = useState(false)
 
-  const add = (q: number) => setAmount((a) => Math.min(config.max_bet, seat.chip_stack, a + q))
+  const add = (q: number) => {
+    sound.chip()
+    setAmount((a) => Math.min(config.max_bet, seat.chip_stack, a + q))
+  }
   const canConfirm = amount >= config.min_bet && amount <= seat.chip_stack
 
   async function go(betAmount: number) {

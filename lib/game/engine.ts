@@ -359,64 +359,36 @@ export function computeActionPatch(
 }
 
 // ---------------------------------------------------------------------
-// DEALER TURN + SETTLEMENT: reveal hole, dealer auto-plays, settle all hands.
+// DEALER TURN + SETTLEMENT
+// AI dealer: reveal + auto-play + settle in one step.
+// Human dealer: reveal (start turn) → manual hit(s) → stand (settle).
 // ---------------------------------------------------------------------
-export function computeDealerSettlePatch(
-  state: RoundState,
-  dealerHandId: string
-): { patch: RoundPatch } {
-  const rules = rulesFromConfig(state.config)
-  const drawer = makeDrawer(state)
+
+function dealerHole(state: RoundState): Card {
   if (!state.dealerHoleCard) throw new Error('hole card missing')
+  return { rank: state.dealerHoleCard.rank as Rank, suit: state.dealerHoleCard.suit as Suit }
+}
 
-  const dealerHand = state.hands.find((h) => h.id === dealerHandId)
-  if (!dealerHand) throw new Error('dealer hand missing')
-
-  const upCard = toCards(dealerHand)[0]
-  const hole: Card = {
-    rank: state.dealerHoleCard.rank as Rank,
-    suit: state.dealerHoleCard.suit as Suit,
-  }
-
-  const insertCards: RoundPatch['insert_cards'] = []
-  // Reveal hole card as index 1.
-  insertCards.push({ hand_id: dealerHandId, card_index: 1, rank: hole.rank, suit: hole.suit })
-
-  // Does any non-terminal player hand still need the dealer to draw?
-  const livePlayerHands = state.hands.filter(
-    (h) => !h.is_dealer && ['active', 'stood', 'blackjack'].includes(h.status)
-  )
-  const anyoneLive = livePlayerHands.some((h) => h.status === 'stood' || h.status === 'blackjack')
-
-  let dealerCards: Card[] = [upCard, hole]
-  if (anyoneLive) {
-    const res = playDealer([upCard, hole], () => drawer.draw(), rules)
-    dealerCards = res.cards
-    // Insert the dealer's drawn cards (beyond up + hole).
-    for (let i = 2; i < dealerCards.length; i++) {
-      insertCards.push({
-        hand_id: dealerHandId,
-        card_index: i,
-        rank: dealerCards[i].rank,
-        suit: dealerCards[i].suit,
-      })
-    }
-  }
-
-  const dealerBJ = isBlackjack([upCard, hole])
+/** Settle every player hand against the dealer's FINAL cards. Shared by the AI
+ *  auto-play and the human dealer's stand. Marks the round complete. */
+function buildSettlement(
+  state: RoundState,
+  dealerHandId: string,
+  dealerCards: Card[],
+  insertCards: NonNullable<RoundPatch['insert_cards']>,
+  deckCursor: number
+): RoundPatch {
+  const rules = rulesFromConfig(state.config)
+  const dealerBJ = isBlackjack(dealerCards) // natural only (2 cards)
   const updateHands: RoundPatch['update_hands'] = []
   const ledger: RoundPatch['ledger'] = []
-  // Net flow to the dealer/bank = everything players staked minus everything
-  // they're paid. Credited to the dealer seat below (human dealer only).
   let dealerNet = 0
 
-  // Settle every player hand.
   for (const h of state.hands.filter((x) => !x.is_dealer)) {
     const seatId = h.seat_id!
     const surrendered = h.status === 'surrendered'
     const playerCards = toCards(h)
 
-    // Insurance side bet resolves against dealer blackjack.
     if (h.insurance_bet > 0) {
       const insReturn = settleInsurance(h.insurance_bet, dealerBJ)
       dealerNet += h.insurance_bet - insReturn
@@ -426,7 +398,7 @@ export function computeDealerSettlePatch(
     }
 
     if (h.status === 'busted') {
-      dealerNet += h.bet_amount // dealer keeps the busted stake
+      dealerNet += h.bet_amount
       updateHands.push({ id: h.id, status: 'settled', outcome: 'lose', payout: 0 })
       continue
     }
@@ -443,29 +415,91 @@ export function computeDealerSettlePatch(
     updateHands.push({ id: h.id, status: 'settled', outcome: result.outcome, payout: result.payout })
   }
 
-  // A human dealer is the bank: their chips move by the net of the table, so
-  // the table is zero-sum. (AI dealer = the house, no seat to credit.)
+  // Human dealer = the bank: their chips move by the table's net (zero-sum).
   if (state.room.dealer_seat_id && dealerNet !== 0) {
     ledger.push({ seat_id: state.room.dealer_seat_id, round_id: state.round.id, hand_id: dealerHandId, type: 'payout', amount: dealerNet })
   }
 
-  // Mark dealer hand settled.
   const dealerTotal = handTotal(dealerCards)
-  updateHands.push({
-    id: dealerHandId,
-    status: dealerTotal.isBust ? 'busted' : 'stood',
-  })
+  updateHands.push({ id: dealerHandId, status: dealerTotal.isBust ? 'busted' : 'stood' })
 
-  const patch: RoundPatch = {
-    insert_cards: insertCards,
+  return {
+    insert_cards: insertCards.length ? insertCards : undefined,
     update_hands: updateHands,
     ledger: ledger.length ? ledger : undefined,
-    deck_cursor: drawer.cursor,
+    deck_cursor: deckCursor,
     reveal_hole: true,
     round: { phase: 'complete', active_hand_id: null, turn_deadline: null },
   }
+}
 
-  return { patch }
+/** AI dealer: reveal hole, auto-play fixed rules, settle. */
+export function computeDealerSettlePatch(state: RoundState, dealerHandId: string): { patch: RoundPatch } {
+  const rules = rulesFromConfig(state.config)
+  const drawer = makeDrawer(state)
+  const dealerHand = state.hands.find((h) => h.id === dealerHandId)
+  if (!dealerHand) throw new Error('dealer hand missing')
+  const upCard = toCards(dealerHand)[0]
+  const hole = dealerHole(state)
+
+  const insertCards: NonNullable<RoundPatch['insert_cards']> = [
+    { hand_id: dealerHandId, card_index: 1, rank: hole.rank, suit: hole.suit },
+  ]
+
+  const anyoneLive = state.hands.some((h) => !h.is_dealer && (h.status === 'stood' || h.status === 'blackjack'))
+  let dealerCards: Card[] = [upCard, hole]
+  if (anyoneLive) {
+    const res = playDealer([upCard, hole], () => drawer.draw(), rules)
+    dealerCards = res.cards
+    for (let i = 2; i < dealerCards.length; i++) {
+      insertCards.push({ hand_id: dealerHandId, card_index: i, rank: dealerCards[i].rank, suit: dealerCards[i].suit })
+    }
+  }
+  return { patch: buildSettlement(state, dealerHandId, dealerCards, insertCards, drawer.cursor) }
+}
+
+/** Human dealer: reveal the hole and hand the turn to the dealer. */
+export function computeDealerRevealPatch(state: RoundState, dealerHandId: string): { patch: RoundPatch } {
+  const hole = dealerHole(state)
+  return {
+    patch: {
+      insert_cards: [{ hand_id: dealerHandId, card_index: 1, rank: hole.rank, suit: hole.suit }],
+      reveal_hole: true,
+      round: { active_hand_id: dealerHandId, turn_deadline: deadline(state.config.turn_timer_seconds) },
+    },
+  }
+}
+
+/** Human dealer takes one card. Returns whether the hand busted. */
+export function computeDealerHitPatch(state: RoundState, dealerHandId: string): { patch: RoundPatch; bust: boolean } {
+  const drawer = makeDrawer(state)
+  const dealerHand = state.hands.find((h) => h.id === dealerHandId)
+  if (!dealerHand) throw new Error('dealer hand missing')
+  const cards = toCards(dealerHand)
+  const c = drawer.draw()
+  const total = handTotal([...cards, c])
+  const bust = total.isBust
+  return {
+    patch: {
+      insert_cards: [{ hand_id: dealerHandId, card_index: cards.length, rank: c.rank, suit: c.suit }],
+      deck_cursor: drawer.cursor,
+      round: bust ? {} : { active_hand_id: dealerHandId, turn_deadline: deadline(state.config.turn_timer_seconds) },
+    },
+    bust,
+  }
+}
+
+/** Human dealer stands (or has busted): settle against current cards. */
+export function computeDealerStandPatch(state: RoundState, dealerHandId: string): { patch: RoundPatch } {
+  const dealerHand = state.hands.find((h) => h.id === dealerHandId)
+  if (!dealerHand) throw new Error('dealer hand missing')
+  const dealerCards = toCards(dealerHand) // hole already revealed + any hits
+  return { patch: buildSettlement(state, dealerHandId, dealerCards, [], state.deckCursor) }
+}
+
+/** Is this round's dealer a human (occupies a seat)? */
+export function hasHumanDealer(state: RoundState): boolean {
+  return !!state.room.dealer_seat_id
 }
 
 export function dealerUpcard(state: RoundState): Card {

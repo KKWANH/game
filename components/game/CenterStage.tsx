@@ -42,8 +42,8 @@ export function CenterStage({
     subtitle = isMyTurn ? '행동을 선택하세요' : '기다리는 중…'
     tone = 'turn'
   } else if (phase === 'dealer_turn') {
-    title = '딜러 차례'
-    subtitle = '딜러가 카드를 받는 중…'
+    title = isMyTurn ? '딜러 차례 (당신)' : '딜러 차례'
+    subtitle = isMyTurn ? '히트 또는 스탠드' : '딜러가 카드를 받는 중…'
     tone = 'dealer'
   } else if (phase === 'settlement' || phase === 'complete') {
     title = '라운드 종료'
@@ -51,7 +51,7 @@ export function CenterStage({
     tone = 'done'
   }
 
-  const showTimer = (phase === 'player_turns' || phase === 'betting') && secondsLeft !== null
+  const showTimer = (phase === 'player_turns' || phase === 'betting' || (phase === 'dealer_turn' && isMyTurn)) && secondsLeft !== null
 
   return (
     <div className="pointer-events-none flex flex-col items-center justify-center gap-3 text-center">

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { sound } from '@/lib/sound'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useRoomRealtime } from '@/lib/realtime/use-room-realtime'
@@ -11,6 +12,7 @@ import { SeatPod } from '@/components/table/SeatPod'
 import { DealerArea } from '@/components/table/DealerArea'
 import { CenterStage } from '@/components/game/CenterStage'
 import { ActionBar } from '@/components/game/ActionBar'
+import { DealerActionBar } from '@/components/game/DealerActionBar'
 import { BetControls } from '@/components/game/BetControls'
 import { SettlementScreen } from '@/components/settlement/SettlementScreen'
 import { HostSettlementPanel } from '@/components/game/HostSettlementPanel'
@@ -53,6 +55,30 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
 
   const activeSeat = seats.find((s) => hands.some((h) => h.id === activeHandId && h.seat_id === s.id))
   const isMyTurn = !!myActiveHand
+  // Human dealer playing their own hand during the dealer turn.
+  const isMyDealerTurn =
+    !!mySeat?.is_dealer && round?.phase === 'dealer_turn' && !!dealerHand && activeHandId === dealerHand.id
+
+  // ---- Sound effects on key transitions ----
+  const myTurnNow = isMyTurn || isMyDealerTurn
+  const prev = useRef({ phase: '', myTurn: false })
+  useEffect(() => {
+    const phase = round?.phase ?? ''
+    if (phase === 'player_turns' && prev.current.phase !== 'player_turns') sound.deal()
+    if (myTurnNow && !prev.current.myTurn) sound.turn()
+    if (phase === 'complete' && prev.current.phase !== 'complete' && mySeat && !mySeat.is_dealer) {
+      const mine = hands.filter((h) => h.seat_id === mySeat.id && !h.is_dealer)
+      if (mine.some((h) => h.outcome === 'win' || h.outcome === 'blackjack')) sound.win()
+      else if (mine.some((h) => h.outcome === 'lose')) sound.lose()
+    }
+    prev.current = { phase, myTurn: myTurnNow }
+  }, [round?.phase, myTurnNow, hands, mySeat])
+
+  useEffect(() => {
+    const unlock = () => sound.unlock()
+    window.addEventListener('pointerdown', unlock, { once: true })
+    return () => window.removeEventListener('pointerdown', unlock)
+  }, [])
   const insuranceOffered =
     round?.phase === 'player_turns' && !!config?.allow_insurance && dealerUpcard?.rank === 'A'
 
@@ -91,7 +117,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
 
       <main className="flex flex-1 items-center justify-center overflow-hidden p-2 sm:p-5">
         <div className="wood-rim relative w-full max-w-4xl rounded-[2.2rem] p-2 sm:rounded-[3.5rem] sm:p-[14px]">
-          <div className="felt-surface relative flex min-h-[58vh] flex-col items-center justify-between overflow-hidden rounded-[1.6rem] p-4 pb-3 sm:min-h-[60vh] sm:rounded-[3rem] sm:p-7">
+          <div className="felt-surface relative flex min-h-[58vh] flex-col items-center justify-between overflow-hidden rounded-[1.6rem] p-4 pb-7 sm:min-h-[60vh] sm:rounded-[3rem] sm:p-7 sm:pb-10">
             {/* Dealer */}
             <div className="relative z-10 flex flex-col items-center gap-1">
               <DealerArea dealerHand={dealerHand} phase={round?.phase ?? null} />
@@ -110,7 +136,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
                 secondsLeft={secondsLeft}
                 turnSeconds={config?.turn_timer_seconds ?? 30}
                 activePlayerName={activeSeat?.display_name ?? null}
-                isMyTurn={isMyTurn}
+                isMyTurn={isMyTurn || isMyDealerTurn}
               />
             </div>
 
@@ -120,7 +146,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
                 {slots.map((s, i) => {
                   const center = (maxSeats - 1) / 2
                   const d = center === 0 ? 0 : Math.abs(i - center) / center
-                  const dip = (1 - d * d) * 14 // middle seats sit slightly lower → bottom arc
+                  const dip = (1 - d * d) * 9 // middle seats sit slightly lower → bottom arc
                   return (
                     <div key={s?.id ?? `empty-${i}`} style={{ transform: `translateY(${dip}px)` }}>
                       <SeatPod
@@ -146,6 +172,8 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
         {/* Primary contextual control */}
         {!mySeat ? (
           <JoinCta roomId={roomId} disabled={busy !== null} />
+        ) : isMyDealerTurn && dealerHand && round ? (
+          <DealerActionBar roundId={round.id} dealerHand={dealerHand} />
         ) : round?.phase === 'player_turns' && myActiveHand && config ? (
           <ActionBar
             roundId={round.id}
@@ -219,6 +247,7 @@ function Header({
       </div>
       <div className="flex items-center gap-2.5 text-sm">
         <span className="text-muted-foreground">👤 {playerCount}/{maxSeats}</span>
+        <MuteButton />
         <button
           onClick={() => { navigator.clipboard?.writeText(code); toast.success('초대 코드 복사됨: ' + code) }}
           className="rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 font-mono text-xs font-bold tracking-widest text-gold"
@@ -229,6 +258,21 @@ function Header({
         <span className={`h-2.5 w-2.5 rounded-full ${connected ? 'bg-accent' : 'bg-muted-foreground/40'}`} title={connected ? '실시간 연결됨' : '연결 중...'} />
       </div>
     </header>
+  )
+}
+
+function MuteButton() {
+  const [muted, setMuted] = useState(false)
+  useEffect(() => setMuted(sound.isMuted()), [])
+  return (
+    <button
+      onClick={() => setMuted(sound.toggle())}
+      className="text-base leading-none text-muted-foreground transition hover:text-gold"
+      title={muted ? '소리 켜기' : '소리 끄기'}
+      aria-label="sound toggle"
+    >
+      {muted ? '🔇' : '🔊'}
+    </button>
   )
 }
 
