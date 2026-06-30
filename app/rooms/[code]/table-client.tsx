@@ -17,7 +17,7 @@ import { SettlementScreen } from '@/components/settlement/SettlementScreen'
 import { HostSettlementPanel } from '@/components/game/HostSettlementPanel'
 import { RoomSettingsPanel } from '@/components/game/RoomSettingsPanel'
 import { startRound, aiAct } from '@/actions/game-actions'
-import { takeSeat, buyIn, addAiSeat, removeSeat } from '@/actions/room-actions'
+import { takeSeat, buyIn, addAiSeat, removeSeat, leaveSeat } from '@/actions/room-actions'
 import { formatChips } from '@/lib/utils'
 import { formatMoney, DEFAULT_MONEY, type MoneyConfig } from '@/lib/money'
 import type { Card, Rank, Suit } from '@/lib/blackjack'
@@ -94,6 +94,21 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
     return () => window.removeEventListener('pointerdown', unlock)
   }, [])
 
+  // Best-effort free-my-seat on tab close so abandoned rooms don't linger as open.
+  const mySeatId = mySeat?.id
+  useEffect(() => {
+    if (!mySeatId) return
+    const onHide = () => {
+      try {
+        navigator.sendBeacon('/api/leave', new Blob([JSON.stringify({ seatId: mySeatId })], { type: 'application/json' }))
+      } catch {
+        // ignore
+      }
+    }
+    window.addEventListener('pagehide', onHide)
+    return () => window.removeEventListener('pagehide', onHide)
+  }, [mySeatId])
+
   // Drive AI seats. During (simultaneous) betting, fire whenever any AI hand
   // hasn't bet yet; during player turns, fire when the active hand is an AI's.
   // Any client may fire it; the server is idempotent (version guard).
@@ -147,6 +162,10 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
         connected={connected}
         playerCount={playerSeats.length}
         maxSeats={maxSeats}
+        onLeave={async () => {
+          if (mySeat) await leaveSeat(mySeat.id).catch(() => {})
+          window.location.href = '/'
+        }}
       />
 
       {interim && <InterimBanner settlement={interim} mySeatId={mySeat?.id ?? null} />}
@@ -300,17 +319,19 @@ function Header({
   connected,
   playerCount,
   maxSeats,
+  onLeave,
 }: {
   roomName: string
   code: string
   connected: boolean
   playerCount: number
   maxSeats: number
+  onLeave?: () => void
 }) {
   return (
     <header className="flex items-center justify-between gap-3 px-4 py-2.5">
       <div className="flex items-center gap-2.5">
-        <a href="/" className="text-sm text-muted-foreground hover:text-foreground">← 나가기</a>
+        <button onClick={onLeave} className="text-sm text-muted-foreground hover:text-foreground">← 나가기</button>
         <h1 className="text-base font-extrabold">{roomName}</h1>
       </div>
       <div className="flex items-center gap-2.5 text-sm">

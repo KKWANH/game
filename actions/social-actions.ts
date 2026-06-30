@@ -44,23 +44,26 @@ export async function listOpenRooms(): Promise<OpenRoom[]> {
     service.from('room_config').select('room_id, min_bet, max_bet, max_seats').in('room_id', ids),
   ])
 
-  return rooms.map((r) => {
-    const rs = (seats ?? []).filter((s) => s.room_id === r.id)
-    const cfg = (configs ?? []).find((c) => c.room_id === r.id)
-    const host = rs.find((s) => s.user_id === r.host_user_id)
-    return {
-      id: r.id,
-      code: r.code,
-      name: r.name,
-      dealerType: r.dealer_type,
-      status: r.status as 'lobby' | 'active',
-      hostName: host?.display_name ?? '호스트',
-      humans: rs.filter((s) => !s.is_dealer && !s.is_ai && s.user_id).length,
-      ais: rs.filter((s) => s.is_ai).length,
-      maxSeats: cfg?.max_seats ?? 7,
-      minBet: cfg?.min_bet ?? 10,
-      maxBet: cfg?.max_bet ?? 1000,
-      joined: rs.some((s) => s.user_id === user.id),
-    }
-  })
+  return rooms
+    .map((r) => {
+      const rs = (seats ?? []).filter((s) => s.room_id === r.id)
+      const cfg = (configs ?? []).find((c) => c.room_id === r.id)
+      const host = rs.find((s) => s.user_id === r.host_user_id)
+      return {
+        id: r.id,
+        code: r.code,
+        name: r.name,
+        dealerType: r.dealer_type,
+        status: r.status as 'lobby' | 'active',
+        hostName: host?.display_name ?? '호스트',
+        humans: rs.filter((s) => !s.is_dealer && !s.is_ai && s.user_id).length,
+        ais: rs.filter((s) => s.is_ai).length,
+        maxSeats: cfg?.max_seats ?? 7,
+        minBet: cfg?.min_bet ?? 10,
+        maxBet: cfg?.max_bet ?? 1000,
+        joined: rs.some((s) => s.user_id === user.id),
+      }
+    })
+    // Hide rooms nobody's actually in (everyone left) — but keep rooms I'm in.
+    .filter((r) => r.humans > 0 || r.joined)
 }

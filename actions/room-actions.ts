@@ -193,7 +193,20 @@ export async function buyIn(seatId: string, amount: number) {
 export async function leaveSeat(seatId: string) {
   await requireUser()
   const service = createServiceClient()
+  const { data: seat } = await service.from('seats').select('room_id').eq('id', seatId).single()
   await service.from('seats').update({ status: 'left', user_id: null }).eq('id', seatId)
+
+  // If that was the last human in the room, close it so it stops showing as open.
+  if (seat) {
+    const { data: remaining } = await service
+      .from('seats')
+      .select('id, is_ai, user_id')
+      .eq('room_id', seat.room_id)
+      .neq('status', 'left')
+    const humansLeft = (remaining ?? []).some((s) => !s.is_ai && s.user_id)
+    if (!humansLeft) await service.from('rooms').update({ status: 'closed' }).eq('id', seat.room_id)
+  }
+  return { ok: true }
 }
 
 const DIFF_LABEL: Record<string, string> = { easy: '쉬움', normal: '보통', hard: '어려움' }
