@@ -55,6 +55,10 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
 
   const myHands = mySeat ? hands.filter((h) => h.seat_id === mySeat.id && !h.is_dealer) : []
   const myActiveHand = myHands.find((h) => h.id === activeHandId) ?? null
+  // Simultaneous betting: my still-open betting hand (null once I've bet/passed).
+  const myBettingHand = myHands.find((h) => h.status === 'betting' && h.bet_amount === 0) ?? null
+  // How many seats are still deciding their bet (for the "waiting" hint).
+  const bettingPending = hands.filter((h) => !h.is_dealer && h.status === 'betting' && h.bet_amount === 0).length
 
   const activeSeat = seats.find((s) => hands.some((h) => h.id === activeHandId && h.seat_id === s.id))
   const isMyTurn = !!myActiveHand
@@ -88,14 +92,22 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
     return () => window.removeEventListener('pointerdown', unlock)
   }, [])
 
-  // Drive an AI seat when it's its turn (betting or playing). Any client fires
-  // it after a short "thinking" delay; the server is idempotent (version guard).
+  // Drive AI seats. During (simultaneous) betting, fire whenever any AI hand
+  // hasn't bet yet; during player turns, fire when the active hand is an AI's.
+  // Any client may fire it; the server is idempotent (version guard).
   useEffect(() => {
     const phase = round?.phase
-    if (!round || (phase !== 'betting' && phase !== 'player_turns')) return
-    const activeHand = hands.find((h) => h.id === round.active_hand_id)
-    const activeSeatObj = seats.find((s) => s.id === activeHand?.seat_id)
-    if (!activeSeatObj?.is_ai) return
+    if (!round) return
+    let aiPending = false
+    if (phase === 'betting') {
+      aiPending = hands.some(
+        (h) => !h.is_dealer && h.status === 'betting' && h.bet_amount === 0 && seats.find((s) => s.id === h.seat_id)?.is_ai
+      )
+    } else if (phase === 'player_turns') {
+      const activeHand = hands.find((h) => h.id === round.active_hand_id)
+      aiPending = !!seats.find((s) => s.id === activeHand?.seat_id)?.is_ai
+    }
+    if (!aiPending) return
     const id = setTimeout(() => aiAct(round.id).catch(() => {}), 350 + Math.floor(Math.random() * 250))
     return () => clearTimeout(id)
   }, [round, hands, seats])
@@ -159,6 +171,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
                 turnSeconds={config?.turn_timer_seconds ?? 30}
                 activePlayerName={activeSeat?.display_name ?? null}
                 isMyTurn={isMyTurn}
+                myBetOpen={!!myBettingHand}
                 resultNet={
                   round?.phase === 'complete' && mySeat && !mySeat.is_dealer && myHands.length
                     ? myHands.reduce((s, h) => s + ((h.payout ?? 0) - h.bet_amount), 0)
@@ -212,8 +225,12 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
             splitCount={myHands.length}
             insuranceOffered={!!insuranceOffered}
           />
-        ) : round?.phase === 'betting' && myActiveHand && !mySeat.is_dealer ? (
+        ) : round?.phase === 'betting' && myBettingHand && !mySeat.is_dealer ? (
           <BetControls roundId={round.id} seat={mySeat} config={config!} />
+        ) : round?.phase === 'betting' && !mySeat.is_dealer ? (
+          <p className="text-sm text-muted-foreground">
+            ✓ 베팅 완료 · 다른 플레이어 {bettingPending}명 대기 중…
+          </p>
         ) : (
           <WaitingHint
             phase={round?.phase ?? null}

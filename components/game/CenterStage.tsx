@@ -13,6 +13,7 @@ export function CenterStage({
   turnSeconds,
   activePlayerName,
   isMyTurn,
+  myBetOpen,
   resultNet,
 }: {
   status: RoomStatus | null
@@ -21,6 +22,8 @@ export function CenterStage({
   turnSeconds: number
   activePlayerName: string | null
   isMyTurn: boolean
+  /** During (simultaneous) betting: this player still needs to bet/pass. */
+  myBetOpen?: boolean
   /** Local player's net for the just-finished round (null = not applicable). */
   resultNet?: number | null
 }) {
@@ -33,8 +36,8 @@ export function CenterStage({
     subtitle = '호스트가 게임을 시작하면 베팅이 열립니다'
     tone = 'idle'
   } else if (phase === 'betting') {
-    title = isMyTurn ? '베팅하세요!' : `${activePlayerName ?? '플레이어'} 베팅 중`
-    subtitle = isMyTurn ? '칩을 걸거나 패스하세요' : '차례를 기다리는 중…'
+    title = myBetOpen ? '베팅하세요!' : '베팅 중'
+    subtitle = myBetOpen ? '칩을 걸거나 패스하세요' : '모두 베팅을 기다리는 중…'
     tone = 'bet'
   } else if (phase === 'dealing') {
     title = '카드 분배'

@@ -33,9 +33,12 @@ export function BetControls({
   async function go(betAmount: number) {
     setPending(true)
     try {
-      const res = await submitBet({ roundId, seatId: seat.id, amount: betAmount })
-      if (res?.conflict) toast.info('차례가 지났어요.')
+      const res = (await submitBet({ roundId, seatId: seat.id, amount: betAmount })) as {
+        conflict?: boolean
+      }
+      if (res?.conflict) toast.info('잠시 후 다시 시도해주세요.')
       else if (betAmount > 0) toast.success(`${formatChips(betAmount)} 베팅`)
+      else toast.success('이번 판 패스')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '베팅 실패')
     } finally {

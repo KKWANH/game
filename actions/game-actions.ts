@@ -86,10 +86,9 @@ async function openBettingRound(service: Service, roomId: string) {
     status: 'betting' as const,
     seat_order: s.seat_index * SEAT_ORDER_GAP,
   }))
-  const { data: hands } = await service.from('hands').insert(handRows).select('*')
-  const first = (hands ?? []).sort((a, b) => a.seat_order - b.seat_order)[0]
-
-  await service.from('game_rounds').update({ active_hand_id: first?.id ?? null }).eq('id', round.id)
+  await service.from('hands').insert(handRows)
+  // Simultaneous betting: no per-seat turn — everyone bets at once against a
+  // single shared deadline, so active_hand_id stays null during betting.
 
   await service.from('rooms').update({ status: 'active', current_round_id: round.id }).eq('id', roomId)
   return { roundId: round.id as string }
@@ -131,16 +130,61 @@ export async function autoNextRound(roomId: string) {
 }
 
 // ---------------------------------------------------------------------
-// Sequential betting
+// Simultaneous betting — everyone bets at once against one shared deadline.
+// Concurrent bets are serialized by reload+retry on the version guard, so two
+// players locking in at the same moment never error out.
 // ---------------------------------------------------------------------
 
 const BetSchema = z.object({
   roundId: z.string().uuid(),
   seatId: z.string().uuid(),
-  amount: z.coerce.number().int().nonnegative(), // 0 = pass
+  amount: z.coerce.number().int().nonnegative(), // 0 = pass (sit the round out)
 })
 
-/** Place a bet (or pass with amount 0) on your timed betting turn. */
+/** A hand that has neither bet nor passed yet. */
+function isUnacted(h: { is_dealer: boolean; status: string; bet_amount: number }) {
+  return !h.is_dealer && h.status === 'betting' && h.bet_amount === 0
+}
+
+/** Lock in one hand's bet (or pass), retrying through version conflicts. When it
+ *  was the last hand to act, flips the round to dealing and deals. */
+async function commitBet(service: Service, roundId: string, handId: string, amount: number) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const state = await loadRoundState(service, roundId)
+    if (state.round.phase !== 'betting') return { ok: true }
+    const hand = state.hands.find((h) => h.id === handId)
+    if (!hand || hand.is_dealer) return { ok: true }
+    if (!isUnacted(hand)) return { ok: true } // already bet/passed — idempotent
+
+    if (amount > 0) {
+      const seat = state.seats.find((s) => s.id === hand.seat_id)
+      if (seat && amount > seat.chip_stack) throw new Error('칩이 부족합니다.')
+    }
+
+    const patch: Parameters<typeof commitRound>[3] = { update_hands: [], round: {} }
+    if (amount > 0) {
+      patch.update_hands = [{ id: hand.id, bet_amount: amount }]
+      patch.ledger = [{ seat_id: hand.seat_id!, round_id: roundId, hand_id: hand.id, type: 'bet', amount: -amount }]
+    } else {
+      patch.update_hands = [{ id: hand.id, status: 'settled' }] // passed → sits out
+    }
+    // Everyone (besides this hand) has acted → deal.
+    const stillWaiting = state.hands.some((h) => h.id !== hand.id && isUnacted(h))
+    if (!stillWaiting) patch.round = { phase: 'dealing', active_hand_id: null, turn_deadline: null }
+
+    try {
+      await commitRound(service, roundId, state.round.version, patch)
+    } catch (e) {
+      if (e instanceof VersionConflict) continue // reload + retry
+      throw e
+    }
+    if (!stillWaiting) await dealOrVoid(service, roundId)
+    return { ok: true }
+  }
+  return { conflict: true }
+}
+
+/** Place a bet (or pass with amount 0). No turn order — bet anytime in betting. */
 export async function submitBet(input: z.input<typeof BetSchema>) {
   const user = await requireUser()
   const p = BetSchema.parse(input)
@@ -148,59 +192,44 @@ export async function submitBet(input: z.input<typeof BetSchema>) {
   const state = await loadRoundState(service, p.roundId)
 
   if (state.round.phase !== 'betting') throw new Error('베팅 단계가 아닙니다.')
-  const hand = state.hands.find((h) => h.id === state.round.active_hand_id)
-  if (!hand || hand.seat_id !== p.seatId) throw new Error('당신의 베팅 차례가 아닙니다.')
-
   const seat = state.seats.find((s) => s.id === p.seatId)
   if (!seat || seat.user_id !== user.id) throw new Error('본인 자리가 아닙니다.')
+  const hand = state.hands.find((h) => h.seat_id === p.seatId && !h.is_dealer)
+  if (!hand) throw new Error('베팅할 핸드가 없습니다.')
+  if (!isUnacted(hand)) return { ok: true } // already locked in
 
   if (p.amount > 0) {
     const cfg = state.config
     if (p.amount < cfg.min_bet || p.amount > cfg.max_bet) throw new Error(`베팅은 ${cfg.min_bet}~${cfg.max_bet} 사이여야 합니다.`)
     if (p.amount > seat.chip_stack) throw new Error('칩이 부족합니다.')
   }
-  return advanceBetting(service, state, hand.id, p.amount)
+  return commitBet(service, p.roundId, hand.id, p.amount)
 }
 
-/** Any client may fire this once the betting turn deadline has passed. */
+/** Any client may fire this once the shared betting deadline has passed —
+ *  auto-passes everyone who hasn't acted, then deals. */
 export async function bettingTimeout(roundId: string) {
   await requireUser()
   const service = createServiceClient()
-  const state = await loadRoundState(service, roundId)
-  if (state.round.phase !== 'betting' || !state.round.active_hand_id || !state.round.turn_deadline) return { ok: true }
-  if (Date.now() < new Date(state.round.turn_deadline).getTime()) return { tooEarly: true }
-  return advanceBetting(service, state, state.round.active_hand_id, 0) // auto-pass
-}
-
-/** Record this seat's bet/pass and move to the next bettor — or deal. */
-async function advanceBetting(service: Service, state: RoundState, actingHandId: string, amount: number) {
-  const acting = state.hands.find((h) => h.id === actingHandId)
-  if (!acting) throw new Error('핸드를 찾을 수 없습니다.')
-
-  const next = state.hands
-    .filter((h) => h.status === 'betting' && !h.is_dealer && h.seat_order > acting.seat_order)
-    .sort((a, b) => a.seat_order - b.seat_order)[0]
-
-  const patch: Parameters<typeof commitRound>[3] = { update_hands: [], round: {} }
-  if (amount > 0) {
-    patch.update_hands = [{ id: acting.id, bet_amount: amount }]
-    patch.ledger = [{ seat_id: acting.seat_id!, round_id: state.round.id, hand_id: acting.id, type: 'bet', amount: -amount }]
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const state = await loadRoundState(service, roundId)
+    if (state.round.phase !== 'betting' || !state.round.turn_deadline) return { ok: true }
+    if (Date.now() < new Date(state.round.turn_deadline).getTime()) return { tooEarly: true }
+    const pending = state.hands.filter(isUnacted)
+    const patch: Parameters<typeof commitRound>[3] = {
+      update_hands: pending.map((h) => ({ id: h.id, status: 'settled' })),
+      round: { phase: 'dealing', active_hand_id: null, turn_deadline: null },
+    }
+    try {
+      await commitRound(service, roundId, state.round.version, patch)
+    } catch (e) {
+      if (e instanceof VersionConflict) continue
+      throw e
+    }
+    await dealOrVoid(service, roundId)
+    return { ok: true }
   }
-  if (next) {
-    patch.round = { active_hand_id: next.id, turn_deadline: deadline(state.config.turn_timer_seconds) }
-  } else {
-    patch.round = { phase: 'dealing', active_hand_id: null, turn_deadline: null }
-  }
-
-  try {
-    await commitRound(service, state.round.id, state.round.version, patch)
-  } catch (e) {
-    if (e instanceof VersionConflict) return { conflict: true }
-    throw e
-  }
-
-  if (!next) await dealOrVoid(service, state.round.id)
-  return { ok: true }
+  return { conflict: true }
 }
 
 /** Betting finished: deal to everyone who bet, or void the round if nobody did. */
@@ -310,17 +339,26 @@ export async function aiAct(roundId: string) {
   await requireUser()
   const service = createServiceClient()
   const state = await loadRoundState(service, roundId)
+
+  // Simultaneous betting: lock in every AI seat's bet (no turn order).
+  if (state.round.phase === 'betting') {
+    const aiHands = state.hands.filter(
+      (h) => isUnacted(h) && state.seats.find((s) => s.id === h.seat_id)?.is_ai
+    )
+    for (const h of aiHands) {
+      const seat = state.seats.find((s) => s.id === h.seat_id)!
+      const amount = decideBet(rulesFromConfig(state.config), seat.chip_stack, state.config.min_bet, state.config.max_bet, seat.ai_difficulty)
+      await commitBet(service, roundId, h.id, amount)
+    }
+    return { ok: true }
+  }
+
   const activeId = state.round.active_hand_id
   if (!activeId) return { ok: true }
   const hand = state.hands.find((h) => h.id === activeId)
   const seat = state.seats.find((s) => s.id === hand?.seat_id)
   if (!hand || !seat || !seat.is_ai || seat.is_dealer) return { ok: true } // not an AI's turn
   const difficulty = seat.ai_difficulty
-
-  if (state.round.phase === 'betting') {
-    const amount = decideBet(rulesFromConfig(state.config), seat.chip_stack, state.config.min_bet, state.config.max_bet, difficulty)
-    return advanceBetting(service, state, hand.id, amount)
-  }
 
   if (state.round.phase === 'player_turns') {
     const cards = [...hand.cards]
