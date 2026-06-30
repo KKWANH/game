@@ -251,6 +251,12 @@ export function computeActionPatch(
       const drawA = drawer.draw() // to original
       const drawB = drawer.draw() // to new hand
 
+      // Split aces take one card each and stand. Any split hand that lands on 21
+      // (e.g. A+10) auto-stands too — it's a plain 21, NOT a natural blackjack.
+      const aceOneCard = isAces && rules.splitAcesOneCard
+      const origStood = aceOneCard || handTotal([cards[0], drawA]).best === 21
+      const newStood = aceOneCard || handTotal([moved, drawB]).best === 21
+
       insertHands.push({
         id: newHandId,
         round_id: state.round.id,
@@ -260,7 +266,7 @@ export function computeActionPatch(
         split_depth: hand.split_depth + 1,
         bet_amount: hand.bet_amount,
         is_split_aces: isAces,
-        status: 'active',
+        status: newStood ? 'stood' : 'active',
         seat_order: hand.seat_order + splitCount, // keep within the seat's block
       })
 
@@ -274,18 +280,17 @@ export function computeActionPatch(
       insertCards.push({ hand_id: newHandId, card_index: 0, rank: moved.rank, suit: moved.suit })
       insertCards.push({ hand_id: newHandId, card_index: 1, rank: drawB.rank, suit: drawB.suit })
 
-      // NOTE: requires the action layer to first delete the original's old index-1 row.
+      // The original hand keeps card_index 0; its stale index-1 row is overwritten
+      // by the drawA upsert above (commit RPC upserts on (hand_id, card_index)).
       updateHands.push({
         id: hand.id,
         split_depth: hand.split_depth + 1,
         is_split_aces: isAces,
-        status: isAces && rules.splitAcesOneCard ? 'stood' : 'active',
+        status: origStood ? 'stood' : 'active',
       })
-      if (isAces && rules.splitAcesOneCard) {
-        // Both split-ace hands take exactly one card and stand.
-        updateHands.push({ id: newHandId, status: 'stood' })
-        handTerminal = true
-      }
+      // The acting (original) hand is done if it stood; play then moves to the
+      // new split hand (if still active) or onward.
+      handTerminal = origStood
       break
     }
     case 'insurance': {
