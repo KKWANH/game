@@ -48,6 +48,8 @@ export type RoomRow = {
   currency: string
   unit_chips: number
   unit_amount: number
+  /** host paused the auto-next loop to change settings. (migration 0009) */
+  paused: boolean
   created_at: string
   updated_at: string
 }

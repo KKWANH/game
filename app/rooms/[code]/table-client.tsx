@@ -15,6 +15,7 @@ import { ActionBar } from '@/components/game/ActionBar'
 import { BetControls } from '@/components/game/BetControls'
 import { SettlementScreen } from '@/components/settlement/SettlementScreen'
 import { HostSettlementPanel } from '@/components/game/HostSettlementPanel'
+import { RoomSettingsPanel } from '@/components/game/RoomSettingsPanel'
 import { startRound, aiAct } from '@/actions/game-actions'
 import { takeSeat, buyIn, addAiSeat, removeSeat } from '@/actions/room-actions'
 import { formatChips } from '@/lib/utils'
@@ -37,6 +38,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
 
   const secondsLeft = useTurnTimer(round?.id ?? null, roomId, round?.turn_deadline ?? null, round?.phase ?? null)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [aiDiff, setAiDiff] = useState<'easy' | 'normal' | 'hard'>('normal')
 
@@ -273,6 +275,9 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
               >
                 🤖 AI 추가
               </Button>
+              <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => setSettingsOpen(true)}>
+                ⚙ 방 설정
+              </Button>
               <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => setPanelOpen(true)}>
                 정산 / 재배분
               </Button>
@@ -282,6 +287,9 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
       </BottomDock>
 
       {panelOpen && <HostSettlementPanel roomId={roomId} seats={playerSeats} onClose={() => setPanelOpen(false)} />}
+      {settingsOpen && room && config && (
+        <RoomSettingsPanel room={room} config={config} onClose={() => setSettingsOpen(false)} />
+      )}
     </div>
   )
 }

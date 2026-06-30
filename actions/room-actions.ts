@@ -252,3 +252,45 @@ export async function closeRoom(roomId: string) {
   await service.from('rooms').update({ status: 'closed' }).eq('id', roomId)
   revalidatePath(`/rooms`)
 }
+
+async function requireHost(roomId: string) {
+  const user = await requireUser()
+  const service = createServiceClient()
+  const { data: room } = await service.from('rooms').select('host_user_id').eq('id', roomId).single()
+  if (!room || room.host_user_id !== user.id) throw new Error('호스트만 가능합니다.')
+  return service
+}
+
+/** Pause/resume the auto-next loop so the host can change settings between rounds. */
+export async function setRoomPaused(roomId: string, paused: boolean) {
+  const service = await requireHost(roomId)
+  const { error } = await service.from('rooms').update({ paused }).eq('id', roomId)
+  if (error) throw new Error('일시정지 실패 — 마이그레이션 0009를 먼저 적용하세요. (' + error.message + ')')
+  return { ok: true, paused }
+}
+
+const RoomSettingsSchema = z.object({
+  minBet: z.coerce.number().int().min(1).optional(),
+  maxBet: z.coerce.number().int().min(1).optional(),
+  numDecks: z.coerce.number().int().min(1).max(8).optional(),
+  turnTimer: z.coerce.number().int().min(5).max(120).optional(),
+})
+
+/** Host updates game settings — takes effect on the NEXT round (each round
+ *  snapshots its own config, so a live round is never disturbed). */
+export async function updateRoomSettings(roomId: string, input: z.input<typeof RoomSettingsSchema>) {
+  const service = await requireHost(roomId)
+  const p = RoomSettingsSchema.parse(input)
+  const patch: Partial<{ min_bet: number; max_bet: number; num_decks: number; turn_timer_seconds: number }> = {}
+  if (p.minBet != null) patch.min_bet = p.minBet
+  if (p.maxBet != null) patch.max_bet = p.maxBet
+  if (p.numDecks != null) patch.num_decks = p.numDecks
+  if (p.turnTimer != null) patch.turn_timer_seconds = p.turnTimer
+  if (patch.min_bet != null && patch.max_bet != null && patch.min_bet > patch.max_bet) {
+    throw new Error('최소 베팅이 최대 베팅보다 큽니다.')
+  }
+  if (Object.keys(patch).length === 0) return { ok: true }
+  const { error } = await service.from('room_config').update(patch).eq('room_id', roomId)
+  if (error) throw new Error('설정 저장 실패: ' + error.message)
+  return { ok: true }
+}

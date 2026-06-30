@@ -108,8 +108,9 @@ export async function startRound(roomId: string) {
 export async function autoNextRound(roomId: string) {
   await requireUser()
   const service = createServiceClient()
-  const { data: room } = await service.from('rooms').select('status, current_round_id').eq('id', roomId).single()
+  const { data: room } = await service.from('rooms').select('*').eq('id', roomId).single()
   if (!room || room.status !== 'active') return { ok: true }
+  if (room.paused) return { ok: true } // host paused to change settings — no new round
   if (room.current_round_id) {
     const { data: cur } = await service
       .from('game_rounds')
