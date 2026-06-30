@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { Panel } from '@/components/ui/input'
-import { formatChips, cn } from '@/lib/utils'
+import { formatChips, formatWon, cn } from '@/lib/utils'
 import type { SettlementRow } from '@/lib/supabase/types'
 
 export function SettlementScreen({ settlement }: { settlement: SettlementRow }) {
@@ -10,6 +10,7 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
   const aiNet =
     settlement.aiNet ?? nets.filter((n) => n.isAi).reduce((s, n) => s + n.net, 0)
   const humanCount = nets.filter((n) => !n.isAi).length
+  const krw = settlement.chip_value_krw ?? 0
 
   return (
     <motion.div
@@ -20,6 +21,9 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
       <h1 className="text-center text-3xl font-extrabold">
         <span className="shimmer-gold">최종 정산</span>
       </h1>
+      {krw > 0 && (
+        <p className="-mt-4 text-center text-sm text-gold">1칩 = {formatChips(krw)}원 기준</p>
+      )}
 
       <Panel className="divide-y divide-border">
         {nets.map((n) => (
@@ -39,12 +43,20 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
             </div>
             <div
               className={cn(
-                'text-xl font-extrabold tabular-nums',
+                'text-right tabular-nums',
                 n.net > 0 ? 'text-accent' : n.net < 0 ? 'text-destructive' : 'text-muted-foreground'
               )}
             >
-              {n.net > 0 ? '+' : ''}
-              {formatChips(n.net)}
+              <div className="text-xl font-extrabold">
+                {n.net > 0 ? '+' : ''}
+                {formatChips(n.net)}
+              </div>
+              {krw > 0 && (
+                <div className="text-sm font-semibold opacity-90">
+                  {n.net > 0 ? '+' : ''}
+                  {formatWon(n.net, krw)}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -71,7 +83,12 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
                   {' → '}
                   <span className="font-semibold text-accent">{to?.displayName}</span>
                 </span>
-                <span className="font-bold tabular-nums text-gold">{formatChips(t.amount)}</span>
+                <span className="font-bold tabular-nums text-gold">
+                  {krw > 0 ? formatWon(t.amount, krw) : formatChips(t.amount)}
+                  {krw > 0 && (
+                    <span className="ml-1 text-xs font-normal opacity-60">({formatChips(t.amount)}칩)</span>
+                  )}
+                </span>
               </div>
             )
           })}

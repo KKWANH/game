@@ -42,6 +42,8 @@ export type RoomRow = {
   dealer_type: DealerType
   dealer_seat_id: string | null
   current_round_id: string | null
+  /** real-money value of one chip in KRW; 0 = off (chips only). (migration 0007) */
+  chip_value_krw: number
   created_at: string
   updated_at: string
 }
@@ -136,6 +138,10 @@ export type ChipLedgerRow = {
 export type SettlementRow = {
   id: string
   room_id: string
+  /** 'interim' = mid-game snapshot, 'final' = room closed. (migration 0007) */
+  kind?: 'interim' | 'final'
+  /** KRW per chip at compute time; 0 = chips only. (migration 0007) */
+  chip_value_krw?: number
   computed_at: string
   net_by_seat: {
     seatId: string

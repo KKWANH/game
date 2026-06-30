@@ -24,6 +24,8 @@ export interface SettlementResult {
   transfers: { fromSeat: string; toSeat: string; amount: number }[]
   /** combined net held by AI seats — spread evenly across the human players */
   aiNet: number
+  /** KRW per chip; 0 = chips only (real-money display off) */
+  chipValueKrw: number
 }
 
 /** Compute current standings + (for human dealer) the who-pays-whom transfers.
@@ -31,7 +33,11 @@ export interface SettlementResult {
  *  AI seats hold real chips but aren't real people, so their combined net is
  *  spread evenly across the humans before settling — nobody ends up owing (or
  *  being owed by) a bot. "ai가 번 것은 공평하게 분배." */
-function computeStandings(seats: SeatRow[], dealerType: string): SettlementResult {
+function computeStandings(
+  seats: SeatRow[],
+  dealerType: string,
+  chipValueKrw = 0
+): SettlementResult {
   const netBySeat: Standing[] = seats.map((s) => {
     const net = s.chip_stack - s.total_buy_in
     return {
@@ -57,7 +63,7 @@ function computeStandings(seats: SeatRow[], dealerType: string): SettlementResul
       .map((n) => ({ seatId: n.seatId, net: n.settleNet }))
     transfers = minCashFlow(nets)
   }
-  return { netBySeat, transfers, aiNet }
+  return { netBySeat, transfers, aiNet, chipValueKrw }
 }
 
 async function loadHostRoom(roomId: string, userId: string) {
@@ -78,12 +84,96 @@ async function activeSeats(service: ReturnType<typeof createServiceClient>, room
   return seats
 }
 
+/** Insert a settlement row, gracefully degrading if migration 0007 (kind /
+ *  chip_value_krw) hasn't been applied yet — never break the final-settlement
+ *  path over a not-yet-applied column. */
+async function insertSettlement(
+  service: ReturnType<typeof createServiceClient>,
+  row: {
+    room_id: string
+    net_by_seat: SettlementResult['netBySeat']
+    transfers: SettlementResult['transfers']
+    kind: 'interim' | 'final'
+    chip_value_krw: number
+  }
+) {
+  const full = await service.from('settlements').insert(row).select('*').single()
+  if (!full.error) return full.data
+  // Likely the 0007 columns don't exist yet — retry with the original shape.
+  const { kind: _kind, chip_value_krw: _v, ...legacy } = row
+  const { data, error } = await service.from('settlements').insert(legacy).select('*').single()
+  if (error) throw new Error('정산 저장 실패: ' + error.message)
+  return data
+}
+
 /** Read-only current standings — does NOT close the room. For 중간정산. */
 export async function interimSettlement(roomId: string): Promise<SettlementResult> {
   const user = await requireUser()
   const { service, room } = await loadHostRoom(roomId, user.id)
   const seats = await activeSeats(service, roomId)
-  return computeStandings(seats, room.dealer_type)
+  return computeStandings(seats, room.dealer_type, room.chip_value_krw ?? 0)
+}
+
+/** Record a mid-game settlement so "중간 정산 완료" is visible to everyone —
+ *  computes + persists (kind='interim') but does NOT close the room. */
+export async function recordInterimSettlement(roomId: string): Promise<SettlementResult> {
+  const user = await requireUser()
+  const { service, room } = await loadHostRoom(roomId, user.id)
+  await assertBetweenRounds(service, room.current_round_id)
+  const seats = await activeSeats(service, roomId)
+  const result = computeStandings(seats, room.dealer_type, room.chip_value_krw ?? 0)
+  await insertSettlement(service, {
+    room_id: roomId,
+    net_by_seat: result.netBySeat,
+    transfers: result.transfers,
+    kind: 'interim',
+    chip_value_krw: result.chipValueKrw,
+  })
+  return result
+}
+
+/** Host sets the real-money value of one chip (KRW). 0 turns the display off. */
+export async function setChipValue(roomId: string, krw: number) {
+  const user = await requireUser()
+  const { service } = await loadHostRoom(roomId, user.id)
+  const value = Math.max(0, Math.floor(krw))
+  const { error } = await service.from('rooms').update({ chip_value_krw: value }).eq('id', roomId)
+  if (error) throw new Error('칩 가치 설정 실패 — 마이그레이션 0007을 먼저 적용하세요. (' + error.message + ')')
+  return { ok: true, chipValueKrw: value }
+}
+
+export interface SeatLedger {
+  seatId: string
+  displayName: string
+  isAi: boolean
+  buyIn: number
+  topUps: number
+  entries: { type: string; amount: number; at: string }[]
+}
+
+/** Per-seat buy-in + top-up history (the 장부) — "각자 얼마를 걸고 충전했는지". */
+export async function roomLedgerSummary(roomId: string): Promise<SeatLedger[]> {
+  const user = await requireUser()
+  const { service } = await loadHostRoom(roomId, user.id)
+  const seats = await activeSeats(service, roomId)
+  const { data: rows } = await service
+    .from('chip_ledger')
+    .select('seat_id, type, amount, created_at')
+    .eq('room_id', roomId)
+    .in('type', ['buy_in', 'adjustment'])
+    .order('created_at', { ascending: true })
+
+  return seats.map((s) => {
+    const mine = (rows ?? []).filter((r) => r.seat_id === s.id)
+    return {
+      seatId: s.id,
+      displayName: s.display_name,
+      isAi: s.is_ai,
+      buyIn: mine.filter((r) => r.type === 'buy_in').reduce((n, r) => n + r.amount, 0),
+      topUps: mine.filter((r) => r.type === 'adjustment').reduce((n, r) => n + r.amount, 0),
+      entries: mine.map((r) => ({ type: r.type, amount: r.amount, at: r.created_at })),
+    }
+  })
 }
 
 /** Final settlement — computes, records, and closes the room. */
@@ -91,14 +181,15 @@ export async function computeSettlement(roomId: string) {
   const user = await requireUser()
   const { service, room } = await loadHostRoom(roomId, user.id)
   const seats = await activeSeats(service, roomId)
-  const result = computeStandings(seats, room.dealer_type)
+  const result = computeStandings(seats, room.dealer_type, room.chip_value_krw ?? 0)
 
-  const { data: settlement, error } = await service
-    .from('settlements')
-    .insert({ room_id: roomId, net_by_seat: result.netBySeat, transfers: result.transfers })
-    .select('*')
-    .single()
-  if (error) throw new Error('정산 실패: ' + error.message)
+  const settlement = await insertSettlement(service, {
+    room_id: roomId,
+    net_by_seat: result.netBySeat,
+    transfers: result.transfers,
+    kind: 'final',
+    chip_value_krw: result.chipValueKrw,
+  })
 
   await service.from('rooms').update({ status: 'settled' }).eq('id', roomId)
   return { settlementId: settlement.id, ...result }

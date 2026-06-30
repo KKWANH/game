@@ -18,8 +18,9 @@ import { SettlementScreen } from '@/components/settlement/SettlementScreen'
 import { HostSettlementPanel } from '@/components/game/HostSettlementPanel'
 import { startRound, aiAct } from '@/actions/game-actions'
 import { takeSeat, buyIn, addAiSeat, removeSeat } from '@/actions/room-actions'
-import { formatChips } from '@/lib/utils'
+import { formatChips, formatWon } from '@/lib/utils'
 import type { Card, Rank, Suit } from '@/lib/blackjack'
+import type { SettlementRow } from '@/lib/supabase/types'
 
 export function TableClient({ roomId, meId }: { roomId: string; meId: string }) {
   useRoomRealtime(roomId, meId)
@@ -28,6 +29,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
   const seats = useRoomStore((s) => s.seats)
   const round = useRoomStore((s) => s.round)
   const settlement = useRoomStore((s) => s.settlement)
+  const interim = useRoomStore((s) => s.interimSettlement)
   const present = useRoomStore((s) => s.presentUserIds)
   const connected = useRoomStore((s) => s.connected)
   const handsWithCards = useRoomStore((s) => s.handsWithCards)
@@ -135,6 +137,8 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
         playerCount={playerSeats.length}
         maxSeats={maxSeats}
       />
+
+      {interim && <InterimBanner settlement={interim} mySeatId={mySeat?.id ?? null} />}
 
       <main className="flex flex-1 items-center justify-center overflow-hidden p-2 sm:p-5">
         <div className="wood-rim relative w-full max-w-4xl rounded-[2.2rem] p-2 sm:rounded-[3.5rem] sm:p-[14px]">
@@ -302,6 +306,44 @@ function Header({
         <span className={`h-2.5 w-2.5 rounded-full ${connected ? 'bg-accent' : 'bg-muted-foreground/40'}`} title={connected ? '실시간 연결됨' : '연결 중...'} />
       </div>
     </header>
+  )
+}
+
+/** Persistent bar shown to everyone after the host records a 중간정산. */
+function InterimBanner({ settlement, mySeatId }: { settlement: SettlementRow; mySeatId: string | null }) {
+  const krw = settlement.chip_value_krw ?? 0
+  const mine = settlement.net_by_seat.find((n) => n.seatId === mySeatId)
+  const time = (() => {
+    try {
+      return new Date(settlement.computed_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    } catch {
+      return ''
+    }
+  })()
+  const owe = settlement.transfers
+    .filter((t) => t.fromSeat === mySeatId)
+    .map((t) => settlement.net_by_seat.find((n) => n.seatId === t.toSeat)?.displayName)
+  const owed = settlement.transfers
+    .filter((t) => t.toSeat === mySeatId)
+    .map((t) => settlement.net_by_seat.find((n) => n.seatId === t.fromSeat)?.displayName)
+  const amount = (chips: number) => (krw > 0 ? formatWon(chips, krw) : `${formatChips(chips)}칩`)
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 border-y border-gold/30 bg-gold/10 px-4 py-1.5 text-center text-xs">
+      <span className="font-bold text-gold">💰 중간정산 완료{time && ` · ${time}`}</span>
+      {mine && (
+        <span className={mine.net > 0 ? 'text-accent' : mine.net < 0 ? 'text-destructive' : 'text-muted-foreground'}>
+          나: {mine.net > 0 ? '+' : ''}
+          {amount(mine.net)}
+        </span>
+      )}
+      {owe.length > 0 && (
+        <span className="text-destructive">→ {owe.join(', ')}에게 보낼 것</span>
+      )}
+      {owed.length > 0 && (
+        <span className="text-accent">← {owed.join(', ')}에게 받을 것</span>
+      )}
+    </div>
   )
 }
 

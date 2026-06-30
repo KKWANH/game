@@ -33,6 +33,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   hands: [],
   cards: [],
   settlement: null,
+  interimSettlement: null,
   meId: null,
   connected: false,
   presentUserIds: [],

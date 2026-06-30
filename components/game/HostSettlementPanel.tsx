@@ -6,13 +6,17 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
-import { formatChips, cn } from '@/lib/utils'
+import { formatChips, formatWon, cn } from '@/lib/utils'
 import {
   interimSettlement,
+  recordInterimSettlement,
+  setChipValue,
+  roomLedgerSummary,
   transferChips,
   rebalanceChips,
   computeSettlement,
   type SettlementResult,
+  type SeatLedger,
 } from '@/actions/settlement-actions'
 import type { SeatRow } from '@/lib/supabase/types'
 
@@ -58,8 +62,30 @@ export function HostSettlementPanel({
   const [toSeat, setToSeat] = useState('')
   const [amount, setAmount] = useState(100)
   const [target, setTarget] = useState(1000)
+  const [rate, setRate] = useState(0)
+  const [rateSynced, setRateSynced] = useState(false)
+  const [ledger, setLedger] = useState<SeatLedger[] | null>(null)
 
   const nets = standings ? [...standings.netBySeat].sort((a, b) => b.net - a.net) : []
+  const krw = standings?.chipValueKrw ?? 0
+  const won = (chips: number) => formatWon(chips, krw)
+
+  // Seed the rate input once from the loaded room value.
+  useEffect(() => {
+    if (standings && !rateSynced) {
+      setRate(standings.chipValueKrw)
+      setRateSynced(true)
+    }
+  }, [standings, rateSynced])
+
+  const toggleLedger = async () => {
+    if (ledger) return setLedger(null)
+    try {
+      setLedger(await roomLedgerSummary(roomId))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '내역 불러오기 실패')
+    }
+  }
 
   // Portal to <body> so the modal escapes the fixed host-dock stacking context.
   const [mounted, setMounted] = useState(false)
@@ -91,6 +117,37 @@ export function HostSettlementPanel({
             </Button>
           </div>
 
+          {/* Real-money stake: 1 chip = N KRW. 0 = chips only. */}
+          <div className="mb-4 flex flex-wrap items-end gap-2 rounded-2xl border border-gold/30 bg-gold/5 p-3">
+            <div className="space-y-1">
+              <Label>현실 머니 — 1칩 가치 (원)</Label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm text-muted-foreground">1칩 =</span>
+                <Input
+                  type="number"
+                  className="w-24"
+                  value={rate}
+                  min={0}
+                  onChange={(e) => setRate(Number(e.target.value))}
+                />
+                <span className="text-sm text-muted-foreground">원</span>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={busy || rate === krw}
+              onClick={() => run(() => setChipValue(roomId, rate), rate > 0 ? `1칩 = ${rate}원 적용` : '현실 머니 끔')}
+            >
+              적용
+            </Button>
+            {krw > 0 && (
+              <span className="ml-auto text-xs text-gold">
+                현재 1칩 = {formatChips(krw)}원 · 정산이 원으로 표시됩니다
+              </span>
+            )}
+          </div>
+
           {/* Standings */}
           <div className="mb-5 overflow-hidden rounded-2xl border border-border">
             {nets.map((n) => (
@@ -114,12 +171,21 @@ export function HostSettlementPanel({
                   </span>
                   <span
                     className={cn(
-                      'w-16 text-right font-bold tabular-nums',
+                      'text-right font-bold tabular-nums',
+                      krw > 0 ? 'w-24' : 'w-16',
                       n.net > 0 ? 'text-accent' : n.net < 0 ? 'text-destructive' : 'text-muted-foreground'
                     )}
                   >
-                    {n.net > 0 ? '+' : ''}
-                    {formatChips(n.net)}
+                    <span className="block">
+                      {n.net > 0 ? '+' : ''}
+                      {formatChips(n.net)}
+                    </span>
+                    {krw > 0 && (
+                      <span className="block text-[11px] opacity-90">
+                        {n.net > 0 ? '+' : ''}
+                        {won(n.net)}
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>
@@ -146,7 +212,14 @@ export function HostSettlementPanel({
                       <span className="text-destructive">{f?.displayName}</span> →{' '}
                       <span className="text-accent">{to?.displayName}</span>
                     </span>
-                    <span className="font-bold text-gold">{formatChips(t.amount)}</span>
+                    <span className="font-bold text-gold">
+                      {krw > 0 ? won(t.amount) : formatChips(t.amount)}
+                      {krw > 0 && (
+                        <span className="ml-1 text-[11px] font-normal opacity-60">
+                          ({formatChips(t.amount)})
+                        </span>
+                      )}
+                    </span>
                   </div>
                 )
               })}
@@ -199,6 +272,52 @@ export function HostSettlementPanel({
               모두 {formatChips(target)}로 맞추기
             </Button>
           </div>
+
+          {/* Buy-in / top-up ledger (장부) */}
+          <div className="mb-4 rounded-2xl border border-border p-3">
+            <button
+              onClick={toggleLedger}
+              className="flex w-full items-center justify-between text-sm font-semibold"
+            >
+              <span>바이인 / 충전 내역</span>
+              <span className="text-muted-foreground">{ledger ? '▲' : '▼'}</span>
+            </button>
+            {ledger && (
+              <div className="mt-2 space-y-1.5">
+                {ledger.map((l) => (
+                  <div key={l.seatId} className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-1.5">
+                      {l.displayName}
+                      {l.isAi && <span className="text-[10px] text-neon-cyan">🤖</span>}
+                    </span>
+                    <span className="text-muted-foreground">
+                      바이인 <span className="font-semibold text-foreground">{formatChips(l.buyIn)}</span>
+                      {l.topUps !== 0 && (
+                        <>
+                          {' · 충전/조정 '}
+                          <span className={cn('font-semibold', l.topUps > 0 ? 'text-accent' : 'text-destructive')}>
+                            {l.topUps > 0 ? '+' : ''}
+                            {formatChips(l.topUps)}
+                          </span>
+                        </>
+                      )}
+                      {krw > 0 && <span className="ml-1 text-[11px] text-gold">({won(l.buyIn + l.topUps)})</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Button
+            variant="secondary"
+            size="lg"
+            className="mb-2 w-full"
+            disabled={busy}
+            onClick={() => run(() => recordInterimSettlement(roomId), '중간정산 기록 완료 — 모두에게 표시됩니다')}
+          >
+            💰 중간정산 확정 (방 유지)
+          </Button>
 
           <Button
             variant="danger"

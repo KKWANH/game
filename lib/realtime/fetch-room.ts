@@ -17,6 +17,8 @@ export interface RoomSnapshot {
   hands: HandRow[]
   cards: HandCardRow[]
   settlement: SettlementRow | null
+  /** Most recent mid-game (kind='interim') settlement, if any. */
+  interimSettlement: SettlementRow | null
 }
 
 /**
@@ -79,6 +81,21 @@ export async function fetchRoomSnapshot(
     settlement = data
   }
 
+  // Latest mid-game settlement so everyone sees "중간 정산 완료". Tolerate the
+  // 0007 `kind` column not existing yet (error → just no interim banner).
+  let interimSettlement: SettlementRow | null = null
+  if (room && room.status !== 'settled') {
+    const { data, error } = await supabase
+      .from('settlements')
+      .select('*')
+      .eq('room_id', roomId)
+      .eq('kind', 'interim')
+      .order('computed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!error) interimSettlement = data
+  }
+
   return {
     room: room ?? null,
     config: config ?? null,
@@ -87,5 +104,6 @@ export async function fetchRoomSnapshot(
     hands,
     cards,
     settlement,
+    interimSettlement,
   }
 }
