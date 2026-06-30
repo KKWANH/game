@@ -101,6 +101,11 @@ export function HostSettlementPanel({
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{n.displayName}</span>
                   {n.isDealer && <span className="text-xs text-gold">딜러</span>}
+                  {n.isAi && (
+                    <span className="rounded bg-neon-cyan/15 px-1.5 py-0.5 text-[10px] font-bold text-neon-cyan">
+                      🤖 AI
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <span className="text-muted-foreground">
@@ -120,6 +125,14 @@ export function HostSettlementPanel({
               </div>
             ))}
           </div>
+
+          {standings && standings.aiNet !== 0 && (
+            <p className="mb-3 rounded-xl bg-neon-cyan/10 px-3 py-2 text-xs leading-relaxed text-neon-cyan">
+              🤖 AI 손익 {standings.aiNet > 0 ? '+' : ''}
+              {formatChips(standings.aiNet)}은(는) 실제 사람이 아니므로 사람{' '}
+              {nets.filter((n) => !n.isAi).length}명에게 공평하게 나눠 아래 송금에 반영했습니다.
+            </p>
+          )}
 
           {standings && standings.transfers.length > 0 && (
             <div className="mb-5 space-y-1 rounded-2xl bg-black/20 p-3">

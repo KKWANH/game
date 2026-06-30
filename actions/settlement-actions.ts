@@ -3,6 +3,7 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireUser } from '@/lib/game/auth'
 import { minCashFlow, SeatNet } from '@/lib/settlement/min-cash-flow'
+import { redistributeAiNet } from '@/lib/settlement/ai-redistribute'
 import type { SeatRow } from '@/lib/supabase/types'
 
 export interface Standing {
@@ -10,32 +11,53 @@ export interface Standing {
   displayName: string
   buyIn: number
   stack: number
+  /** raw chip net (current stack − total buy-in) */
   net: number
+  /** net actually used for who-owes-whom after AI seats are squared out */
+  settleNet: number
   isDealer: boolean
+  isAi: boolean
 }
 
 export interface SettlementResult {
   netBySeat: Standing[]
   transfers: { fromSeat: string; toSeat: string; amount: number }[]
+  /** combined net held by AI seats — spread evenly across the human players */
+  aiNet: number
 }
 
-/** Compute current standings + (for human dealer) the who-pays-whom transfers. */
+/** Compute current standings + (for human dealer) the who-pays-whom transfers.
+ *
+ *  AI seats hold real chips but aren't real people, so their combined net is
+ *  spread evenly across the humans before settling — nobody ends up owing (or
+ *  being owed by) a bot. "ai가 번 것은 공평하게 분배." */
 function computeStandings(seats: SeatRow[], dealerType: string): SettlementResult {
-  const netBySeat: Standing[] = seats.map((s) => ({
-    seatId: s.id,
-    displayName: s.display_name,
-    buyIn: s.total_buy_in,
-    stack: s.chip_stack,
-    net: s.chip_stack - s.total_buy_in,
-    isDealer: s.is_dealer,
-  }))
+  const netBySeat: Standing[] = seats.map((s) => {
+    const net = s.chip_stack - s.total_buy_in
+    return {
+      seatId: s.id,
+      displayName: s.display_name,
+      buyIn: s.total_buy_in,
+      stack: s.chip_stack,
+      net,
+      settleNet: net,
+      isDealer: s.is_dealer,
+      isAi: s.is_ai,
+    }
+  })
+
+  const { settleNet, aiNet } = redistributeAiNet(netBySeat)
+  netBySeat.forEach((n) => (n.settleNet = settleNet[n.seatId]))
 
   let transfers: { fromSeat: string; toSeat: string; amount: number }[] = []
   if (dealerType === 'human') {
-    const nets: SeatNet[] = netBySeat.map((n) => ({ seatId: n.seatId, net: n.net }))
+    // Settle among the humans only, on the AI-adjusted nets.
+    const nets: SeatNet[] = netBySeat
+      .filter((n) => !n.isAi)
+      .map((n) => ({ seatId: n.seatId, net: n.settleNet }))
     transfers = minCashFlow(nets)
   }
-  return { netBySeat, transfers }
+  return { netBySeat, transfers, aiNet }
 }
 
 async function loadHostRoom(roomId: string, userId: string) {

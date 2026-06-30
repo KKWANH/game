@@ -7,6 +7,9 @@ import type { SettlementRow } from '@/lib/supabase/types'
 
 export function SettlementScreen({ settlement }: { settlement: SettlementRow }) {
   const nets = [...settlement.net_by_seat].sort((a, b) => b.net - a.net)
+  const aiNet =
+    settlement.aiNet ?? nets.filter((n) => n.isAi).reduce((s, n) => s + n.net, 0)
+  const humanCount = nets.filter((n) => !n.isAi).length
 
   return (
     <motion.div
@@ -22,7 +25,14 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
         {nets.map((n) => (
           <div key={n.seatId} className="flex items-center justify-between gap-3 p-4">
             <div>
-              <div className="font-semibold">{n.displayName}</div>
+              <div className="flex items-center gap-2 font-semibold">
+                {n.displayName}
+                {n.isAi && (
+                  <span className="rounded bg-neon-cyan/15 px-1.5 py-0.5 text-[10px] font-bold text-neon-cyan">
+                    🤖 AI
+                  </span>
+                )}
+              </div>
               <div className="text-xs text-muted-foreground">
                 바이인 {formatChips(n.buyIn)} → 잔액 {formatChips(n.stack)}
               </div>
@@ -39,6 +49,14 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
           </div>
         ))}
       </Panel>
+
+      {aiNet !== 0 && humanCount > 0 && (
+        <p className="rounded-xl bg-neon-cyan/10 px-4 py-3 text-center text-sm leading-relaxed text-neon-cyan">
+          🤖 AI 손익 {aiNet > 0 ? '+' : ''}
+          {formatChips(aiNet)}은(는) 실제 사람이 아니므로 사람 {humanCount}명에게 공평하게 나눠
+          아래 송금에 반영했습니다.
+        </p>
+      )}
 
       {settlement.transfers.length > 0 ? (
         <Panel className="space-y-2 p-4">

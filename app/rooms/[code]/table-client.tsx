@@ -62,17 +62,25 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
 
   // ---- Sound effects on key transitions ----
   const myTurnNow = isMyTurn || isMyDealerTurn
-  const prev = useRef({ phase: '', myTurn: false })
+  const prev = useRef({ phase: '', myTurn: false, cards: 0, busts: 0, init: false })
   useEffect(() => {
     const phase = round?.phase ?? ''
-    if (phase === 'player_turns' && prev.current.phase !== 'player_turns') sound.deal()
-    if (myTurnNow && !prev.current.myTurn) sound.turn()
-    if (phase === 'complete' && prev.current.phase !== 'complete' && mySeat && !mySeat.is_dealer) {
-      const mine = hands.filter((h) => h.seat_id === mySeat.id && !h.is_dealer)
-      if (mine.some((h) => h.outcome === 'win' || h.outcome === 'blackjack')) sound.win()
-      else if (mine.some((h) => h.outcome === 'lose')) sound.lose()
+    // Per-action feedback: a blip every time a card lands (deal + each hit) and
+    // a "womp" the moment any hand busts. Skip the very first run so joining
+    // mid-round doesn't replay everything already on the felt.
+    const cardCount = hands.reduce((n, h) => n + h.cards.length, 0)
+    const bustCount = hands.filter((h) => h.status === 'busted').length
+    if (prev.current.init) {
+      if (cardCount > prev.current.cards) sound.card()
+      if (bustCount > prev.current.busts) sound.bust()
+      if (myTurnNow && !prev.current.myTurn) sound.turn()
+      if (phase === 'complete' && prev.current.phase !== 'complete' && mySeat && !mySeat.is_dealer) {
+        const mine = hands.filter((h) => h.seat_id === mySeat.id && !h.is_dealer)
+        if (mine.some((h) => h.outcome === 'win' || h.outcome === 'blackjack')) sound.win()
+        else if (mine.some((h) => h.outcome === 'lose')) sound.lose()
+      }
     }
-    prev.current = { phase, myTurn: myTurnNow }
+    prev.current = { phase, myTurn: myTurnNow, cards: cardCount, busts: bustCount, init: true }
   }, [round?.phase, myTurnNow, hands, mySeat])
 
   useEffect(() => {
@@ -89,7 +97,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
     const activeHand = hands.find((h) => h.id === round.active_hand_id)
     const activeSeatObj = seats.find((s) => s.id === activeHand?.seat_id)
     if (!activeSeatObj?.is_ai) return
-    const id = setTimeout(() => aiAct(round.id).catch(() => {}), 900 + Math.floor(Math.random() * 500))
+    const id = setTimeout(() => aiAct(round.id).catch(() => {}), 350 + Math.floor(Math.random() * 250))
     return () => clearTimeout(id)
   }, [round, hands, seats])
   const insuranceOffered =

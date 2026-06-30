@@ -61,6 +61,16 @@ export const sound = {
   deal() {
     blip(420, 0.07, 'square', 0.035)
   },
+  /** a card lands on the felt (deal or hit) — softer, woodier than deal() */
+  card() {
+    blip(300, 0.05, 'triangle', 0.05)
+    blip(180, 0.06, 'sine', 0.04, 0.02)
+  },
+  /** a hand goes over 21 — short descending "womp" */
+  bust() {
+    blip(300, 0.12, 'sawtooth', 0.05)
+    blip(150, 0.28, 'sawtooth', 0.06, 0.09)
+  },
   turn() {
     blip(560, 0.12, 'sine', 0.06)
     blip(760, 0.12, 'sine', 0.05, 0.1)

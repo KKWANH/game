@@ -143,8 +143,14 @@ export type SettlementRow = {
     net: number
     buyIn: number
     stack: number
+    /** Net used for who-owes-whom after AI seats are squared out. Older rows omit it. */
+    settleNet?: number
+    isDealer?: boolean
+    isAi?: boolean
   }[]
   transfers: { fromSeat: string; toSeat: string; amount: number }[]
+  /** Combined net held by AI seats, spread evenly across humans. Older rows omit it. */
+  aiNet?: number
 }
 
 export type RoundSecretRow = {
