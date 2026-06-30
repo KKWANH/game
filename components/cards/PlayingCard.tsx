@@ -20,11 +20,10 @@ export function PlayingCard({ rank, suit, faceDown, index = 0, size = 'md' }: Pl
 
   return (
     <motion.div
-      initial={{ y: -40, opacity: 0, rotateY: 90, scale: 0.8 }}
-      animate={{ y: 0, opacity: 1, rotateY: 0, scale: 1 }}
-      transition={{ type: 'spring', stiffness: 320, damping: 26, delay: index * 0.08 }}
+      initial={{ y: -22, scale: 0.92 }}
+      animate={{ y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 340, damping: 26, delay: index * 0.06 }}
       className={cn('relative shrink-0 rounded-lg select-none', dims)}
-      style={{ transformStyle: 'preserve-3d' }}
     >
       {faceDown ? (
         <div className="absolute inset-0 rounded-lg border border-gold/40 bg-gradient-to-br from-felt-deep to-background overflow-hidden">
@@ -32,13 +31,6 @@ export function PlayingCard({ rank, suit, faceDown, index = 0, size = 'md' }: Pl
         </div>
       ) : (
         <div className="absolute inset-0 overflow-hidden rounded-lg border border-black/10 bg-gradient-to-br from-white to-neutral-100 text-neutral-900 shadow-md">
-          <motion.div
-            className="pointer-events-none absolute inset-0 -skew-x-12"
-            style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent)' }}
-            initial={{ x: '-150%' }}
-            animate={{ x: '150%' }}
-            transition={{ delay: index * 0.08 + 0.2, duration: 0.5, ease: 'easeOut' }}
-          />
           <div className={cn('absolute top-1 left-1.5 font-bold leading-none', red && 'text-rose-600')}>
             <div>{rank}</div>
             <div className="text-xs">{suit ? SUIT_GLYPH[suit] : ''}</div>
