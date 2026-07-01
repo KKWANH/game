@@ -25,9 +25,9 @@ export function PlayingCard({ rank, suit, faceDown, index = 0, size = 'md' }: Pl
 
   return (
     <motion.div
-      initial={{ y: -22, scale: 0.92 }}
-      animate={{ y: 0, scale: 1 }}
-      transition={{ type: 'spring', stiffness: 340, damping: 26, delay: index * 0.06 }}
+      initial={{ y: -34, x: index % 2 ? 12 : -12, rotate: index % 2 ? 7 : -7, scale: 0.9 }}
+      animate={{ y: 0, x: 0, rotate: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 24, delay: index * 0.08 }}
       className={cn('relative shrink-0 select-none', s.card)}
     >
       {faceDown ? (

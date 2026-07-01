@@ -98,7 +98,15 @@ export function SeatPod({
           <span className={cn('h-2 w-2 shrink-0 rounded-full', present ? 'bg-accent' : 'bg-muted-foreground/40')} />
           <span className="max-w-[6.5rem] truncate text-sm font-semibold">{seat.display_name}</span>
         </div>
-        <span className="text-xs font-bold tabular-nums text-gold">{formatChips(seat.chip_stack)}</span>
+        <motion.span
+          key={seat.chip_stack}
+          initial={{ scale: 1.25, color: 'var(--gold-bright)' }}
+          animate={{ scale: 1, color: 'var(--gold)' }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="text-xs font-bold tabular-nums"
+        >
+          {formatChips(seat.chip_stack)}
+        </motion.span>
       </motion.div>
     </div>
   )

@@ -1,5 +1,6 @@
 'use client'
 
+import { motion } from 'framer-motion'
 import { cn, formatChips } from '@/lib/utils'
 
 // Casino-style chip denominations, highest first.
@@ -40,8 +41,11 @@ export function ChipStack({ amount, size = 'sm', label = true }: { amount: numbe
     <div className="flex flex-col items-center">
       <div className="relative" style={{ width: d, height: overlap * (chips.length - 1) + d }}>
         {chips.map((c, i) => (
-          <div
+          <motion.div
             key={i}
+            initial={{ y: -16, scale: 0.6, opacity: 0 }}
+            animate={{ y: 0, scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 24, delay: i * 0.05 }}
             className="absolute left-0 rounded-full"
             style={{
               width: d,
@@ -53,7 +57,7 @@ export function ChipStack({ amount, size = 'sm', label = true }: { amount: numbe
             }}
           >
             <div className="absolute inset-[3px] rounded-full border border-dashed" style={{ borderColor: 'rgba(255,255,255,0.35)' }} />
-          </div>
+          </motion.div>
         ))}
       </div>
       {label && <span className={cn('mt-0.5 font-bold tabular-nums text-gold', size === 'sm' ? 'text-[10px]' : 'text-xs')}>{formatChips(amount)}</span>}
