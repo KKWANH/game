@@ -6,6 +6,8 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Panel } from '@/components/ui/input'
 import { updateDisplayName, signOut } from '@/actions/auth-actions'
+import { useT } from '@/lib/i18n/provider'
+import { LanguageToggle } from '@/components/i18n/LanguageToggle'
 
 export function AccountClient({
   email,
@@ -20,14 +22,15 @@ export function AccountClient({
 }) {
   const [displayName, setDisplayName] = useState(name)
   const [pending, setPending] = useState(false)
+  const t = useT()
 
   async function save() {
     setPending(true)
     try {
       await updateDisplayName(displayName)
-      toast.success('이름을 저장했습니다.')
+      toast.success(t('이름을 저장했습니다.'))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '저장 실패')
+      toast.error(e instanceof Error ? e.message : t('저장 실패'))
     } finally {
       setPending(false)
     }
@@ -37,11 +40,14 @@ export function AccountClient({
     <main className="mx-auto w-full max-w-lg space-y-6 p-4 sm:p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-extrabold">
-          <span className="shimmer-gold">계정 설정</span>
+          <span className="shimmer-gold">{t('계정 설정')}</span>
         </h1>
-        <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
-          ← 게임 선택
-        </Link>
+        <div className="flex items-center gap-2">
+          <LanguageToggle />
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
+            {t('← 게임 선택')}
+          </Link>
+        </div>
       </div>
 
       <Panel className="flex items-center gap-4 p-5">
@@ -60,22 +66,22 @@ export function AccountClient({
             href="/admin"
             className="ml-auto rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs font-bold text-gold"
           >
-            관리자
+            {t('관리자')}
           </Link>
         )}
       </Panel>
 
       <Panel className="space-y-3 p-5">
         <div className="space-y-1">
-          <Label>표시 이름</Label>
+          <Label>{t('표시 이름')}</Label>
           <Input
             value={displayName}
             maxLength={24}
             onChange={(e) => setDisplayName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && save()}
-            placeholder="게임에서 보일 이름"
+            placeholder={t('게임에서 보일 이름')}
           />
-          <p className="text-xs text-muted-foreground">새로 앉는 자리부터 이 이름이 표시됩니다.</p>
+          <p className="text-xs text-muted-foreground">{t('새로 앉는 자리부터 이 이름이 표시됩니다.')}</p>
         </div>
         <Button
           variant="primary"
@@ -83,13 +89,13 @@ export function AccountClient({
           disabled={pending || !displayName.trim() || displayName.trim() === name}
           onClick={save}
         >
-          이름 저장
+          {t('이름 저장')}
         </Button>
       </Panel>
 
       <form action={signOut}>
         <Button type="submit" variant="ghost" size="lg" className="w-full text-destructive">
-          로그아웃
+          {t('로그아웃')}
         </Button>
       </form>
     </main>

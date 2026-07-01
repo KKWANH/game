@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from 'next'
 import { Toaster } from 'sonner'
 import './globals.css'
+import { getLocale } from '@/lib/i18n/locale'
+import { LocaleProvider } from '@/lib/i18n/provider'
 
 export const metadata: Metadata = {
-  title: 'Blackjack · game.kwanho.dev',
-  description: '친구끼리 즐기는 실시간 블랙잭 — 가상 칩, 장부, 최종 정산까지.',
+  title: 'game.kwanho.dev',
+  description: 'Real-time mini-games with friends — virtual chips, ledger, settlement.',
 }
 
 export const viewport: Viewport = {
@@ -13,15 +15,16 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const locale = await getLocale()
   return (
-    <html lang="ko" className="dark">
+    <html lang={locale} className="dark">
       <body className="min-h-dvh antialiased">
-        {children}
+        <LocaleProvider locale={locale}>{children}</LocaleProvider>
         <Toaster theme="dark" position="top-center" richColors />
       </body>
     </html>

@@ -7,6 +7,7 @@ import { ChipButton, ChipStack } from '@/components/chips/ChipStack'
 import { submitBet } from '@/actions/game-actions'
 import { sound } from '@/lib/sound'
 import { formatChips } from '@/lib/utils'
+import { useT } from '@/lib/i18n/provider'
 import type { RoomConfigRow, SeatRow } from '@/lib/supabase/types'
 
 const DENOMS = [10, 25, 50, 100, 500]
@@ -23,6 +24,7 @@ export function BetControls({
   // Build the bet up from 0 — clicking a 100 chip means exactly 100.
   const [amount, setAmount] = useState(0)
   const [pending, setPending] = useState(false)
+  const t = useT()
 
   const add = (q: number) => {
     sound.chip()
@@ -67,11 +69,11 @@ export function BetControls({
       const res = (await submitBet({ roundId, seatId: seat.id, amount: betAmount })) as {
         conflict?: boolean
       }
-      if (res?.conflict) toast.info('잠시 후 다시 시도해주세요.')
-      else if (betAmount > 0) toast.success(`${formatChips(betAmount)} 베팅`)
-      else toast.success('이번 판 패스')
+      if (res?.conflict) toast.info(t('잠시 후 다시 시도해주세요.'))
+      else if (betAmount > 0) toast.success(`${formatChips(betAmount)}${t(' 베팅')}`)
+      else toast.success(t('이번 판 패스'))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '베팅 실패')
+      toast.error(e instanceof Error ? e.message : t('베팅 실패'))
     } finally {
       setPending(false)
     }
@@ -80,7 +82,7 @@ export function BetControls({
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border border-gold/20 bg-card/85 p-4 shadow-xl backdrop-blur">
       <div className="text-xs text-muted-foreground">
-        한도 {formatChips(config.min_bet)}~{formatChips(config.max_bet)} · 보유{' '}
+        {t('한도 ')}{formatChips(config.min_bet)}~{formatChips(config.max_bet)} · {t('보유')}{' '}
         <span className="font-bold text-gold">{formatChips(seat.chip_stack)}</span>
       </div>
 
@@ -104,13 +106,13 @@ export function BetControls({
 
       <div className="flex w-full items-center gap-2">
         <Button size="lg" variant="ghost" disabled={pending} onClick={() => setAmount(0)}>
-          초기화
+          {t('초기화')}
         </Button>
         <Button size="lg" variant="ghost" disabled={pending} onClick={() => go(0)}>
-          패스 <kbd className="ml-1 opacity-60">P</kbd>
+          {t('패스')} <kbd className="ml-1 opacity-60">P</kbd>
         </Button>
         <Button variant="gold" size="lg" className="flex-1" disabled={pending || !canConfirm} onClick={() => go(amount)}>
-          베팅 확정 <kbd className="ml-1 opacity-60">⏎</kbd>
+          {t('베팅 확정')} <kbd className="ml-1 opacity-60">⏎</kbd>
         </Button>
       </div>
     </div>

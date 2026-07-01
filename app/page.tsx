@@ -5,9 +5,14 @@ import { SignInButton } from '@/components/lobby/SignInButton'
 import { Button } from '@/components/ui/button'
 import { FloatingSuits } from '@/components/effects/FloatingSuits'
 import { GameGrid } from '@/components/hub/GameGrid'
+import { LanguageToggle } from '@/components/i18n/LanguageToggle'
+import { getLocale } from '@/lib/i18n/locale'
+import { tr } from '@/lib/i18n/dict'
 
 export default async function Home() {
   const user = await getUser()
+  const locale = await getLocale()
+  const t = (s: string) => tr(s, locale)
   const name =
     (user?.user_metadata?.full_name as string) ||
     (user?.user_metadata?.name as string) ||
@@ -21,25 +26,28 @@ export default async function Home() {
       <div className="relative mx-auto flex max-w-5xl flex-col items-center gap-10 px-4 py-12 sm:py-20">
         <div className="flex w-full items-center justify-between">
           <span className="font-mono text-sm tracking-widest text-muted-foreground">game.kwanho.dev</span>
-          {user ? (
-            <div className="flex items-center gap-2 rounded-full border border-border bg-card/70 px-3 py-1.5">
-              {user.user_metadata?.avatar_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.user_metadata.avatar_url as string} alt="" className="h-6 w-6 rounded-full" />
-              )}
-              <span className="max-w-[8rem] truncate text-sm font-semibold">{name}</span>
-              <Link href="/account" className="text-xs text-muted-foreground hover:text-gold">
-                계정
-              </Link>
-              <form action={signOut}>
-                <Button type="submit" variant="ghost" size="sm">
-                  로그아웃
-                </Button>
-              </form>
-            </div>
-          ) : (
-            <SignInButton next="/" />
-          )}
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            {user ? (
+              <div className="flex items-center gap-2 rounded-full border border-border bg-card/70 px-3 py-1.5">
+                {user.user_metadata?.avatar_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={user.user_metadata.avatar_url as string} alt="" className="h-6 w-6 rounded-full" />
+                )}
+                <span className="max-w-[8rem] truncate text-sm font-semibold">{name}</span>
+                <Link href="/account" className="text-xs text-muted-foreground hover:text-gold">
+                  {t('계정')}
+                </Link>
+                <form action={signOut}>
+                  <Button type="submit" variant="ghost" size="sm">
+                    {t('로그아웃')}
+                  </Button>
+                </form>
+              </div>
+            ) : (
+              <SignInButton next="/" />
+            )}
+          </div>
         </div>
 
         <div className="flex flex-col items-center gap-3 text-center">
@@ -47,14 +55,14 @@ export default async function Home() {
             <span className="shimmer-gold">GAME CENTER</span>
           </h1>
           <p className="max-w-md text-balance leading-relaxed text-muted-foreground">
-            친구들과 함께 즐기는 실시간 미니게임. 게임을 골라 입장하세요.
+            {t('친구들과 함께 즐기는 실시간 미니게임. 게임을 골라 입장하세요.')}
           </p>
         </div>
 
         <GameGrid />
 
         <footer className="pt-8 text-center text-xs text-muted-foreground">
-          가상 칩으로 진행됩니다 · 실제 돈이 아닙니다
+          {t('가상 칩으로 진행됩니다 · 실제 돈이 아닙니다')}
         </footer>
       </div>
     </main>

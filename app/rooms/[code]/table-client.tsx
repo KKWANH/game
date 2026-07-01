@@ -19,6 +19,7 @@ import { RoomSettingsPanel } from '@/components/game/RoomSettingsPanel'
 import { startRound, aiAct } from '@/actions/game-actions'
 import { takeSeat, buyIn, addAiSeat, removeSeat, leaveSeat } from '@/actions/room-actions'
 import { formatChips } from '@/lib/utils'
+import { useT } from '@/lib/i18n/provider'
 import { formatMoney, DEFAULT_MONEY, type MoneyConfig } from '@/lib/money'
 import type { Card, Rank, Suit } from '@/lib/blackjack'
 import type { SettlementRow } from '@/lib/supabase/types'
@@ -37,6 +38,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
   const mySeat = useRoomStore((s) => s.mySeat)()
 
   const secondsLeft = useTurnTimer(round?.id ?? null, roomId, round?.turn_deadline ?? null, round?.phase ?? null)
+  const t = useT()
   const [panelOpen, setPanelOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
@@ -136,7 +138,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
     try {
       await fn()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '실패')
+      toast.error(e instanceof Error ? e.message : t('실패'))
     } finally {
       setBusy(null)
     }
@@ -178,7 +180,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
               <DealerArea dealerHand={dealerHand} phase={round?.phase ?? null} />
               {dealerSeat && (
                 <span className="text-xs text-muted-foreground">
-                  뱅크 · {dealerSeat.display_name} · {formatChips(dealerSeat.chip_stack)}
+                  {t('뱅크 · ')}{dealerSeat.display_name} · {formatChips(dealerSeat.chip_stack)}
                 </span>
               )}
             </div>
@@ -250,7 +252,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
           <BetControls roundId={round.id} seat={mySeat} config={config!} />
         ) : round?.phase === 'betting' && !mySeat.is_dealer ? (
           <p className="text-sm text-muted-foreground">
-            ✓ 베팅 완료 · 다른 플레이어 {bettingPending}명 대기 중…
+            {t('✓ 베팅 완료')} · {t('대기 중')} ({bettingPending})
           </p>
         ) : (
           <WaitingHint
@@ -264,27 +266,27 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
         {/* Secondary rows: buy-in + host controls */}
         <div className="flex flex-wrap items-center justify-center gap-2">
           {mySeat && (
-            <Button size="sm" variant="ghost" disabled={busy !== null} onClick={() => run('buyin', async () => { await buyIn(mySeat.id, 1000); toast.success('1,000 충전') })}>
-              + 충전 (보유 {formatChips(mySeat.chip_stack)})
+            <Button size="sm" variant="ghost" disabled={busy !== null} onClick={() => run('buyin', async () => { await buyIn(mySeat.id, 1000); toast.success(`1,000 ${t('충전')}`) })}>
+              {t('＋ 충전')} ({t('보유 ')}{formatChips(mySeat.chip_stack)})
             </Button>
           )}
           {isHost && (
             <>
               <span className="mx-1 h-4 w-px bg-border" />
-              <span className="text-xs font-bold uppercase tracking-widest text-gold">호스트</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-gold">{t('호스트')}</span>
               {(room?.status === 'lobby' ||
                 (room?.status === 'active' && !round) ||
                 (round?.phase === 'complete' && !round?.dealer_hand_id)) && (
                 <Button size="sm" variant="gold" disabled={busy !== null} onClick={() => run('start', () => startRound(roomId))}>
-                  게임 시작
+                  {t('게임 시작')}
                 </Button>
               )}
               <button
                 onClick={() => setAiDiff((d) => (d === 'easy' ? 'normal' : d === 'normal' ? 'hard' : 'easy'))}
                 className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-gold"
-                title="AI 난이도"
+                title={t('AI 난이도')}
               >
-                {aiDiff === 'easy' ? '쉬움' : aiDiff === 'normal' ? '보통' : '어려움'}
+                {aiDiff === 'easy' ? t('쉬움') : aiDiff === 'normal' ? t('보통') : t('어려움')}
               </button>
               <Button
                 size="sm"
@@ -292,13 +294,13 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
                 disabled={busy !== null || playerSeats.length >= maxSeats}
                 onClick={() => run('addai', () => addAiSeat(roomId, aiDiff))}
               >
-                🤖 AI 추가
+                {t('🤖 AI 추가')}
               </Button>
               <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => setSettingsOpen(true)}>
-                ⚙ 방 설정
+                {t('⚙ 방 설정')}
               </Button>
               <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => setPanelOpen(true)}>
-                정산 / 재배분
+                {t('정산 / 재배분')}
               </Button>
             </>
           )}
@@ -333,23 +335,24 @@ function Header({
   maxSeats: number
   onLeave?: () => void
 }) {
+  const t = useT()
   return (
     <header className="flex items-center justify-between gap-3 px-4 py-2.5">
       <div className="flex items-center gap-2.5">
-        <button onClick={onLeave} className="text-sm text-muted-foreground hover:text-foreground">← 나가기</button>
+        <button onClick={onLeave} className="text-sm text-muted-foreground hover:text-foreground">{t('← 나가기')}</button>
         <h1 className="text-base font-extrabold">{roomName}</h1>
       </div>
       <div className="flex items-center gap-2.5 text-sm">
         <span className="text-muted-foreground">👤 {playerCount}/{maxSeats}</span>
         <MuteButton />
         <button
-          onClick={() => { navigator.clipboard?.writeText(code); toast.success('초대 코드 복사됨: ' + code) }}
+          onClick={() => { navigator.clipboard?.writeText(code); toast.success(t('초대 코드 복사됨: ') + code) }}
           className="rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 font-mono text-xs font-bold tracking-widest text-gold"
-          title="클릭해서 초대 코드 복사"
+          title={t('클릭해서 초대 코드 복사')}
         >
           {code}
         </button>
-        <span className={`h-2.5 w-2.5 rounded-full ${connected ? 'bg-accent' : 'bg-muted-foreground/40'}`} title={connected ? '실시간 연결됨' : '연결 중...'} />
+        <span className={`h-2.5 w-2.5 rounded-full ${connected ? 'bg-accent' : 'bg-muted-foreground/40'}`} title={connected ? t('실시간 연결됨') : t('연결 중...')} />
       </div>
     </header>
   )
@@ -378,21 +381,22 @@ function InterimBanner({ settlement, mySeatId }: { settlement: SettlementRow; my
     .filter((t) => t.toSeat === mySeatId)
     .map((t) => settlement.net_by_seat.find((n) => n.seatId === t.fromSeat)?.displayName)
   const amount = (chips: number) => formatMoney(chips, money)
+  const tt = useT()
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 border-y border-gold/30 bg-gold/10 px-4 py-1.5 text-center text-xs">
-      <span className="font-bold text-gold">💰 중간정산 완료{time && ` · ${time}`}</span>
+      <span className="font-bold text-gold">{tt('💰 중간정산 완료')}{time && ` · ${time}`}</span>
       {mine && (
         <span className={mine.net > 0 ? 'text-accent' : mine.net < 0 ? 'text-destructive' : 'text-muted-foreground'}>
-          나: {mine.net > 0 ? '+' : ''}
+          {tt('나: ')}{mine.net > 0 ? '+' : ''}
           {amount(mine.net)}
         </span>
       )}
       {owe.length > 0 && (
-        <span className="text-destructive">→ {owe.join(', ')}에게 보낼 것</span>
+        <span className="text-destructive">→ {owe.join(', ')}{tt('에게 보낼 것')}</span>
       )}
       {owed.length > 0 && (
-        <span className="text-accent">← {owed.join(', ')}에게 받을 것</span>
+        <span className="text-accent">← {owed.join(', ')}{tt('에게 받을 것')}</span>
       )}
     </div>
   )
@@ -400,12 +404,13 @@ function InterimBanner({ settlement, mySeatId }: { settlement: SettlementRow; my
 
 function MuteButton() {
   const [muted, setMuted] = useState(false)
+  const t = useT()
   useEffect(() => setMuted(sound.isMuted()), [])
   return (
     <button
       onClick={() => setMuted(sound.toggle())}
       className="text-base leading-none text-muted-foreground transition hover:text-gold"
-      title={muted ? '소리 켜기' : '소리 끄기'}
+      title={muted ? t('소리 켜기') : t('소리 끄기')}
       aria-label="sound toggle"
     >
       {muted ? '🔇' : '🔊'}
@@ -432,13 +437,15 @@ function WaitingHint({
   isMyTurn: boolean
   activeName: string | null
 }) {
-  let msg = '대기 중…'
-  if (status === 'lobby' || !phase) msg = '호스트가 게임을 시작하기를 기다리는 중'
-  else if (phase === 'betting') msg = `${activeName ?? '다른 플레이어'} 베팅 중 — 곧 차례가 와요`
-  else if (phase === 'dealing') msg = '카드 분배 중…'
-  else if (phase === 'player_turns') msg = isMyTurn ? '' : `${activeName ?? '다른 플레이어'}의 차례를 기다리는 중`
-  else if (phase === 'dealer_turn') msg = '딜러가 카드를 받는 중…'
-  else if (phase === 'complete' || phase === 'settlement') msg = '라운드 종료 — 다음 판 준비 중…'
+  const t = useT()
+  const who = activeName ?? t('다른 플레이어')
+  let msg = t('대기 중…')
+  if (status === 'lobby' || !phase) msg = t('호스트가 게임을 시작하기를 기다리는 중')
+  else if (phase === 'betting') msg = `${who}${t(' 베팅 중 — 곧 차례가 와요')}`
+  else if (phase === 'dealing') msg = t('카드 분배 중…')
+  else if (phase === 'player_turns') msg = isMyTurn ? '' : `${who}${t('의 차례를 기다리는 중')}`
+  else if (phase === 'dealer_turn') msg = t('딜러가 카드를 받는 중…')
+  else if (phase === 'complete' || phase === 'settlement') msg = t('라운드 종료 — 다음 판 준비 중…')
   if (!msg) return null
   return (
     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -451,9 +458,10 @@ function WaitingHint({
 function JoinCta({ roomId, disabled }: { roomId: string; disabled: boolean }) {
   const [chips, setChips] = useState(1000)
   const [pending, setPending] = useState(false)
+  const t = useT()
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-2">
-      <span className="text-sm text-muted-foreground">아직 관전 중이에요 — 참가해서 베팅하세요</span>
+      <span className="text-sm text-muted-foreground">{t('아직 관전 중이에요 — 참가해서 베팅하세요')}</span>
       <div className="flex w-full items-center gap-2">
         <Input type="number" value={chips} min={0} onChange={(e) => setChips(Number(e.target.value))} className="w-32" />
         <Button
@@ -465,15 +473,15 @@ function JoinCta({ roomId, disabled }: { roomId: string; disabled: boolean }) {
             setPending(true)
             try {
               await takeSeat({ roomId, startingChips: chips })
-              toast.success('착석 완료!')
+              toast.success(t('착석 완료!'))
             } catch (e) {
-              toast.error(e instanceof Error ? e.message : '착석 실패')
+              toast.error(e instanceof Error ? e.message : t('착석 실패'))
             } finally {
               setPending(false)
             }
           }}
         >
-          {formatChips(chips)} 충전하고 앉기
+          {formatChips(chips)} {t('충전하고 앉기')}
         </Button>
       </div>
     </div>

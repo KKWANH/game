@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n/provider'
 
 interface Game {
   key: string
@@ -20,6 +21,7 @@ const GAMES: Game[] = [
 ]
 
 export function GameGrid() {
+  const t = useT()
   return (
     <div className="grid w-full grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {GAMES.map((g, i) => {
@@ -55,15 +57,15 @@ export function GameGrid() {
             </motion.span>
             <div className="relative">
               <div className="text-2xl font-extrabold tracking-tight">{g.name}</div>
-              <div className="text-sm text-muted-foreground">{g.tagline}</div>
+              <div className="text-sm text-muted-foreground">{t(g.tagline)}</div>
             </div>
             {disabled ? (
               <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-bold text-secondary-foreground">
-                COMING SOON
+                {t('COMING SOON')}
               </span>
             ) : (
               <span className="rounded-full bg-gradient-to-r from-gold-bright to-gold px-3 py-1 text-xs font-extrabold text-primary-foreground shadow">
-                입장 →
+                {t('입장 →')}
               </span>
             )}
           </motion.div>

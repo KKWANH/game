@@ -15,6 +15,7 @@ import {
 import type { HandWithCards } from '@/store/room-store'
 import type { RoomConfigRow, SeatRow } from '@/lib/supabase/types'
 import { rulesFromConfig } from '@/lib/game/types'
+import { useT } from '@/lib/i18n/provider'
 
 const LABELS: Record<Action, string> = {
   hit: '히트',
@@ -53,6 +54,7 @@ export function ActionBar({
   insuranceOffered: boolean
 }) {
   const [pending, setPending] = useState<Action | null>(null)
+  const t = useT()
 
   const cards: Card[] = hand.cards.map((c) => ({ rank: c.rank as Rank, suit: c.suit as Suit }))
   const view: HandView = {
@@ -77,9 +79,9 @@ export function ActionBar({
     setPending(action)
     try {
       const res = await playerAction({ roundId, handId: hand.id, action })
-      if (res?.conflict) toast.info('상태가 변경됐어요. 다시 시도하세요.')
+      if (res?.conflict) toast.info(t('상태가 변경됐어요. 다시 시도하세요.'))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '행동 실패')
+      toast.error(e instanceof Error ? e.message : t('행동 실패'))
     } finally {
       setPending(null)
     }
@@ -113,7 +115,7 @@ export function ActionBar({
     <div className="flex flex-wrap items-center justify-center gap-2">
       {showInsurance && (
         <Button variant="gold" size="lg" disabled={pending !== null} onClick={() => act('insurance')}>
-          {LABELS.insurance} <kbd className="ml-1 opacity-60">I</kbd>
+          {t(LABELS.insurance)} <kbd className="ml-1 opacity-60">I</kbd>
         </Button>
       )}
       {order
@@ -126,7 +128,7 @@ export function ActionBar({
             disabled={pending !== null}
             onClick={() => act(a)}
           >
-            {LABELS[a]} <kbd className="ml-1 opacity-60">{KEYS[a].toUpperCase()}</kbd>
+            {t(LABELS[a])} <kbd className="ml-1 opacity-60">{KEYS[a].toUpperCase()}</kbd>
           </Button>
         ))}
     </div>

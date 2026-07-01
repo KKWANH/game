@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { signInWithGoogle } from '@/actions/auth-actions'
+import { useT } from '@/lib/i18n/provider'
 
 export function SignInButton({ next = '/' }: { next?: string }) {
   const [pending, setPending] = useState(false)
+  const t = useT()
   return (
     <Button
       variant="gold"
@@ -17,7 +19,7 @@ export function SignInButton({ next = '/' }: { next?: string }) {
       }}
     >
       <GoogleGlyph />
-      Google로 로그인
+      {t('Google로 로그인')}
     </Button>
   )
 }

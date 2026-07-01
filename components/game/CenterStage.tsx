@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { cn, formatChips } from '@/lib/utils'
+import { useT } from '@/lib/i18n/provider'
 import type { RoundPhase, RoomStatus } from '@/lib/supabase/types'
 
 /** The middle-of-table focal point: makes the felt feel alive and tells every
@@ -27,33 +28,34 @@ export function CenterStage({
   /** Local player's net for the just-finished round (null = not applicable). */
   resultNet?: number | null
 }) {
+  const t = useT()
   let title = ''
   let subtitle = ''
   let tone: 'idle' | 'bet' | 'turn' | 'dealer' | 'done' = 'idle'
 
   if (status === 'lobby' || !phase) {
-    title = '대기 중'
-    subtitle = '호스트가 게임을 시작하면 베팅이 열립니다'
+    title = t('대기 중')
+    subtitle = t('호스트가 게임을 시작하면 베팅이 열립니다')
     tone = 'idle'
   } else if (phase === 'betting') {
-    title = myBetOpen ? '베팅하세요!' : '베팅 중'
-    subtitle = myBetOpen ? '칩을 걸거나 패스하세요' : '모두 베팅을 기다리는 중…'
+    title = myBetOpen ? t('베팅하세요!') : t('베팅 중')
+    subtitle = myBetOpen ? t('칩을 걸거나 패스하세요') : t('모두 베팅을 기다리는 중…')
     tone = 'bet'
   } else if (phase === 'dealing') {
-    title = '카드 분배'
-    subtitle = '딜링 중…'
+    title = t('카드 분배')
+    subtitle = t('딜링 중…')
     tone = 'dealer'
   } else if (phase === 'player_turns') {
-    title = isMyTurn ? '당신의 차례!' : `${activePlayerName ?? '플레이어'}의 차례`
-    subtitle = isMyTurn ? '행동을 선택하세요' : '기다리는 중…'
+    title = isMyTurn ? t('당신의 차례!') : `${activePlayerName ?? t('플레이어')}${t('의 차례')}`
+    subtitle = isMyTurn ? t('행동을 선택하세요') : t('기다리는 중…')
     tone = 'turn'
   } else if (phase === 'dealer_turn') {
-    title = isMyTurn ? '딜러 차례 (당신)' : '딜러 차례'
-    subtitle = isMyTurn ? '히트 또는 스탠드' : '딜러가 카드를 받는 중…'
+    title = t('딜러 차례')
+    subtitle = t('딜러가 카드를 받는 중…')
     tone = 'dealer'
   } else if (phase === 'settlement' || phase === 'complete') {
-    title = '라운드 종료'
-    subtitle = resultNet == null ? '결과 정산 완료' : ''
+    title = t('라운드 종료')
+    subtitle = resultNet == null ? t('결과 정산 완료') : ''
     tone = 'done'
   }
 
@@ -103,7 +105,7 @@ export function CenterStage({
             {formatChips(resultNet!)}
           </span>
           <span className="text-sm font-semibold text-muted-foreground">
-            {resultNet! > 0 ? '획득 🎉' : resultNet! < 0 ? '잃음' : '무승부'}
+            {resultNet! > 0 ? t('획득 🎉') : resultNet! < 0 ? t('잃음') : t('무승부')}
           </span>
         </motion.div>
       )}

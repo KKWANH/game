@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { cn, formatChips } from '@/lib/utils'
 import { HandView } from '@/components/cards/Hand'
 import { ChipStack } from '@/components/chips/ChipStack'
+import { useT } from '@/lib/i18n/provider'
 import type { HandWithCards } from '@/store/room-store'
 import type { SeatRow } from '@/lib/supabase/types'
 
@@ -31,6 +32,7 @@ export function SeatPod({
   onJoin?: () => void
   cardSize?: 'sm' | 'md'
 }) {
+  const t = useT()
   const isActive = !!activeHandId && hands.some((h) => h.id === activeHandId)
 
   if (!seat) {
@@ -49,7 +51,7 @@ export function SeatPod({
             canJoin && 'cursor-pointer hover:border-gold/60 hover:bg-gold/5 hover:text-gold'
           )}
         >
-          {canJoin ? '＋ 여기 앉기' : '빈 자리'}
+          {canJoin ? t('＋ 여기 앉기') : t('빈 자리')}
         </button>
       </div>
     )
@@ -61,7 +63,7 @@ export function SeatPod({
         <button
           onClick={onRemove}
           className="absolute -top-1 right-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-destructive/80 text-[10px] font-bold text-destructive-foreground hover:bg-destructive"
-          title="AI 내보내기"
+          title={t('AI 내보내기')}
         >
           ✕
         </button>
