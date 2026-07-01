@@ -14,7 +14,7 @@ export async function requireUser(): Promise<AuthedUser> {
   if (!user) throw new Error('로그인이 필요합니다.')
   const meta = user.user_metadata ?? {}
   const displayName =
-    meta.full_name || meta.name || (user.email ? user.email.split('@')[0] : '플레이어')
+    meta.display_name || meta.full_name || meta.name || (user.email ? user.email.split('@')[0] : '플레이어')
   return {
     id: user.id,
     displayName,

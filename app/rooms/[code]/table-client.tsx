@@ -164,7 +164,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
         maxSeats={maxSeats}
         onLeave={async () => {
           if (mySeat) await leaveSeat(mySeat.id).catch(() => {})
-          window.location.href = '/'
+          window.location.href = '/blackjack'
         }}
       />
 

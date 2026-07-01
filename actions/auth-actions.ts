@@ -29,3 +29,14 @@ export async function signOut() {
   await supabase.auth.signOut()
   redirect('/')
 }
+
+/** Update the player's display name (stored in user_metadata, preferred by
+ *  requireUser). Applies to seats taken from now on. */
+export async function updateDisplayName(name: string) {
+  const clean = name.trim().slice(0, 24)
+  if (!clean) throw new Error('이름을 입력하세요.')
+  const supabase = await createClient()
+  const { error } = await supabase.auth.updateUser({ data: { display_name: clean } })
+  if (error) throw new Error('이름 변경 실패: ' + error.message)
+  return { ok: true, name: clean }
+}
