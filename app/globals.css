@@ -114,10 +114,10 @@
     color: var(--foreground);
     font-feature-settings: 'rlig' 1, 'calt' 1;
     -webkit-font-smoothing: antialiased;
-    /* Korean must break at word (어절) boundaries, never mid-word, and long
-       tokens should still wrap instead of overflowing. */
+    /* Korean must break at word (어절) boundaries, never mid-syllable. Only
+       break inside a word for genuinely unbreakable long tokens (URLs). */
     word-break: keep-all;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
 }
 

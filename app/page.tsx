@@ -24,21 +24,21 @@ export default async function Home() {
       <FloatingSuits />
 
       <div className="relative mx-auto flex max-w-5xl flex-col items-center gap-10 px-4 py-12 sm:py-20">
-        <div className="flex w-full items-center justify-between">
-          <span className="font-mono text-sm tracking-widest text-muted-foreground">game.kwanho.dev</span>
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
+          <span className="shrink-0 font-mono text-xs tracking-widest text-muted-foreground sm:text-sm">game.kwanho.dev</span>
           <div className="flex items-center gap-2">
             <LanguageToggle />
             {user ? (
               <div className="flex items-center gap-2 rounded-full border border-border bg-card/70 px-3 py-1.5">
                 {user.user_metadata?.avatar_url && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={user.user_metadata.avatar_url as string} alt="" className="h-6 w-6 rounded-full" />
+                  <img src={user.user_metadata.avatar_url as string} alt="" className="h-6 w-6 shrink-0 rounded-full" />
                 )}
-                <span className="max-w-[8rem] truncate text-sm font-semibold">{name}</span>
-                <Link href="/account" className="text-xs text-muted-foreground hover:text-gold">
+                <span className="max-w-[6rem] truncate text-sm font-semibold sm:max-w-[8rem]">{name}</span>
+                <Link href="/account" className="shrink-0 whitespace-nowrap text-xs text-muted-foreground hover:text-gold">
                   {t('계정')}
                 </Link>
-                <form action={signOut}>
+                <form action={signOut} className="shrink-0">
                   <Button type="submit" variant="ghost" size="sm">
                     {t('로그아웃')}
                   </Button>
