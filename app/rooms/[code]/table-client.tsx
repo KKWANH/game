@@ -307,7 +307,12 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
 
       {panelOpen && <HostSettlementPanel roomId={roomId} seats={playerSeats} onClose={() => setPanelOpen(false)} />}
       {settingsOpen && room && config && (
-        <RoomSettingsPanel room={room} config={config} onClose={() => setSettingsOpen(false)} />
+        <RoomSettingsPanel
+          room={room}
+          config={config}
+          iAmDealer={!!mySeat?.is_dealer}
+          onClose={() => setSettingsOpen(false)}
+        />
       )}
     </div>
   )

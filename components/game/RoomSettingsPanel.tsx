@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { CURRENCIES, describeStake } from '@/lib/money'
-import { updateRoomSettings, setRoomPaused } from '@/actions/room-actions'
+import { updateRoomSettings, setRoomPaused, setDealerRole } from '@/actions/room-actions'
 import { setRoomMoney } from '@/actions/settlement-actions'
 import type { RoomConfigRow, RoomRow } from '@/lib/supabase/types'
 
@@ -16,14 +16,17 @@ import type { RoomConfigRow, RoomRow } from '@/lib/supabase/types'
 export function RoomSettingsPanel({
   room,
   config,
+  iAmDealer,
   onClose,
 }: {
   room: RoomRow
   config: RoomConfigRow
+  iAmDealer: boolean
   onClose: () => void
 }) {
   const [busy, setBusy] = useState(false)
   const [paused, setPaused] = useState(room.paused ?? false)
+  const [dealer, setDealer] = useState(iAmDealer)
   const [minBet, setMinBet] = useState(config.min_bet)
   const [maxBet, setMaxBet] = useState(config.max_bet)
   const [numDecks, setNumDecks] = useState(config.num_decks)
@@ -48,6 +51,15 @@ export function RoomSettingsPanel({
     const next = !paused
     await run(() => setRoomPaused(room.id, next), next ? '방을 멈췄습니다' : '게임을 재개합니다')
     setPaused(next)
+  }
+
+  const toggleDealer = async () => {
+    const next = !dealer
+    await run(
+      () => setDealerRole(room.id, next),
+      next ? '다음 판부터 딜러(뱅크)가 됩니다' : '다음 판부터 플레이어로 돌아갑니다'
+    )
+    setDealer(next)
   }
 
   const [mounted, setMounted] = useState(false)
@@ -89,6 +101,19 @@ export function RoomSettingsPanel({
             </div>
             <Button size="sm" variant={paused ? 'gold' : 'secondary'} disabled={busy} onClick={togglePause}>
               {paused ? '재개' : '멈춤'}
+            </Button>
+          </div>
+
+          {/* Dealer role — host takes/gives up the bank. Applies next round. */}
+          <div className="mb-4 flex items-center justify-between rounded-2xl border border-border p-3">
+            <div>
+              <div className="font-semibold">{dealer ? '🎩 내가 딜러(뱅크)' : '🙂 플레이어'}</div>
+              <div className="text-xs text-muted-foreground">
+                딜러가 되면 뱅크 역할만 맡고 손패는 자동 진행돼요. (다음 판 적용)
+              </div>
+            </div>
+            <Button size="sm" variant={dealer ? 'secondary' : 'gold'} disabled={busy} onClick={toggleDealer}>
+              {dealer ? '플레이어로' : '딜러 되기'}
             </Button>
           </div>
 

@@ -282,6 +282,46 @@ export async function setRoomPaused(roomId: string, paused: boolean) {
   return { ok: true, paused }
 }
 
+/** Guard: dealer/role changes only allowed between rounds. */
+async function assertBetweenRounds(service: ReturnType<typeof createServiceClient>, roomId: string) {
+  const { data: room } = await service.from('rooms').select('current_round_id').eq('id', roomId).single()
+  if (!room?.current_round_id) return
+  const { data: round } = await service.from('game_rounds').select('phase').eq('id', room.current_round_id).maybeSingle()
+  if (round && round.phase !== 'complete') {
+    throw new Error('라운드 진행 중에는 바꿀 수 없습니다. 라운드를 끝낸 뒤(또는 멈춘 뒤) 하세요.')
+  }
+}
+
+/** Host takes (or gives up) the dealer/bank role. Their own seat becomes the
+ *  dealer — the dealer hand still auto-plays; they just hold the bank. Applies
+ *  from the next round. */
+export async function setDealerRole(roomId: string, beDealer: boolean) {
+  const service = await requireHost(roomId)
+  await assertBetweenRounds(service, roomId)
+  const { data: room } = await service.from('rooms').select('host_user_id').eq('id', roomId).single()
+  if (!room) throw new Error('방을 찾을 수 없습니다.')
+
+  const { data: hostSeat } = await service
+    .from('seats')
+    .select('id')
+    .eq('room_id', roomId)
+    .eq('user_id', room.host_user_id)
+    .neq('status', 'left')
+    .maybeSingle()
+  if (!hostSeat) throw new Error('먼저 자리에 앉아주세요.')
+
+  if (beDealer) {
+    // Only one dealer: demote any current dealer seat back to a player.
+    await service.from('seats').update({ is_dealer: false }).eq('room_id', roomId).eq('is_dealer', true)
+    await service.from('seats').update({ is_dealer: true }).eq('id', hostSeat.id)
+    await service.from('rooms').update({ dealer_type: 'human', dealer_seat_id: hostSeat.id }).eq('id', roomId)
+  } else {
+    await service.from('seats').update({ is_dealer: false }).eq('id', hostSeat.id)
+    await service.from('rooms').update({ dealer_type: 'ai', dealer_seat_id: null }).eq('id', roomId)
+  }
+  return { ok: true, beDealer }
+}
+
 const RoomSettingsSchema = z.object({
   minBet: z.coerce.number().int().min(1).optional(),
   maxBet: z.coerce.number().int().min(1).optional(),
