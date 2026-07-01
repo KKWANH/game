@@ -5,6 +5,8 @@ import { SignInButton } from '@/components/lobby/SignInButton'
 import { CreateRoomForm } from '@/components/lobby/CreateRoomForm'
 import { JoinRoomForm } from '@/components/lobby/JoinRoomForm'
 import { RoomBrowser } from '@/components/lobby/RoomBrowser'
+import { FriendsPanel } from '@/components/lobby/FriendsPanel'
+import { ensureProfile } from '@/actions/social-actions'
 import { Button } from '@/components/ui/button'
 import { FloatingSuits } from '@/components/effects/FloatingSuits'
 import { Hero } from '@/components/lobby/Hero'
@@ -16,6 +18,7 @@ export default async function BlackjackLobby() {
   const user = await getUser()
   const locale = await getLocale()
   const t = (s: string) => tr(s, locale)
+  if (user) await ensureProfile()
   const name =
     (user?.user_metadata?.full_name as string) ||
     (user?.user_metadata?.name as string) ||
@@ -77,7 +80,10 @@ export default async function BlackjackLobby() {
               <JoinRoomForm />
             </div>
 
-            <RoomBrowser />
+            <div className="grid w-full gap-5 md:grid-cols-2">
+              <RoomBrowser />
+              <FriendsPanel />
+            </div>
           </>
         )}
 

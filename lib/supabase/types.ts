@@ -177,6 +177,22 @@ export type RoundSecretRow = {
   shuffle_seed: string | null
 }
 
+// Social phase 2 (migration 0010)
+export type ProfileRow = {
+  id: string
+  display_name: string
+  avatar_url: string | null
+  updated_at: string
+}
+
+export type FriendshipRow = {
+  user_low: string
+  user_high: string
+  status: 'pending' | 'accepted'
+  requested_by: string
+  created_at: string
+}
+
 type Tbl<R> = {
   Row: R
   Insert: Partial<R>
@@ -195,6 +211,8 @@ export type Database = {
       hand_cards: Tbl<HandCardRow>
       chip_ledger: Tbl<ChipLedgerRow>
       settlements: Tbl<SettlementRow>
+      profiles: Tbl<ProfileRow>
+      friendships: Tbl<FriendshipRow>
     }
     Views: Record<string, never>
     Functions: {

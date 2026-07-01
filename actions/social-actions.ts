@@ -3,6 +3,181 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireUser } from '@/lib/game/auth'
 
+// ---------------------------------------------------------------------
+// Social phase 2 — profiles (member directory) + friendships. All writes go
+// through the service client (RLS only grants SELECT). Everything tolerates the
+// 0010 tables being absent so the UI degrades to empty instead of crashing.
+// ---------------------------------------------------------------------
+
+type Svc = ReturnType<typeof createServiceClient>
+
+/** Canonical ordered pair so each relationship is a single row. */
+function pair(a: string, b: string): [string, string] {
+  return a < b ? [a, b] : [b, a]
+}
+
+/** Upsert the caller's public profile (called on lobby load). Best-effort. */
+export async function ensureProfile() {
+  try {
+    const user = await requireUser()
+    const service = createServiceClient()
+    await service.from('profiles').upsert({
+      id: user.id,
+      display_name: user.displayName,
+      avatar_url: user.avatarUrl,
+      updated_at: new Date().toISOString(),
+    })
+  } catch {
+    // table missing (pre-0010) or transient — ignore
+  }
+  return { ok: true }
+}
+
+export type FriendStatus = 'none' | 'friends' | 'incoming' | 'outgoing'
+
+export interface Member {
+  id: string
+  name: string
+  avatar: string | null
+  status: FriendStatus
+}
+
+export interface Friend {
+  id: string
+  name: string
+  avatar: string | null
+  /** code of a joinable room they're currently in, if any */
+  roomCode: string | null
+}
+
+/** Map each user id → code of a lobby/active room they occupy (for "join"). */
+async function currentRooms(service: Svc, userIds: string[]): Promise<Record<string, string>> {
+  if (userIds.length === 0) return {}
+  const { data: seats } = await service
+    .from('seats')
+    .select('user_id, room_id')
+    .in('user_id', userIds)
+    .neq('status', 'left')
+  const roomIds = Array.from(new Set((seats ?? []).map((s) => s.room_id)))
+  if (roomIds.length === 0) return {}
+  const { data: rooms } = await service
+    .from('rooms')
+    .select('id, code, status')
+    .in('id', roomIds)
+    .in('status', ['lobby', 'active'])
+  const codeByRoom = new Map((rooms ?? []).map((r) => [r.id, r.code]))
+  const out: Record<string, string> = {}
+  for (const s of seats ?? []) {
+    if (s.user_id && codeByRoom.has(s.room_id)) out[s.user_id] = codeByRoom.get(s.room_id)!
+  }
+  return out
+}
+
+/** The caller's friends (accepted) + pending requests in/out, with live room. */
+export async function listFriends(): Promise<{ friends: Friend[]; incoming: Member[]; outgoing: Member[] }> {
+  const empty = { friends: [], incoming: [], outgoing: [] }
+  try {
+    const user = await requireUser()
+    const service = createServiceClient()
+    const { data: rows, error } = await service
+      .from('friendships')
+      .select('*')
+      .or(`user_low.eq.${user.id},user_high.eq.${user.id}`)
+    if (error || !rows) return empty
+
+    const otherOf = (r: (typeof rows)[number]) => (r.user_low === user.id ? r.user_high : r.user_low)
+    const ids = rows.map(otherOf)
+    const { data: profs } = await service.from('profiles').select('*').in('id', ids.length ? ids : ['x'])
+    const p = new Map((profs ?? []).map((x) => [x.id, x]))
+    const name = (id: string) => p.get(id)?.display_name ?? '플레이어'
+    const avatar = (id: string) => p.get(id)?.avatar_url ?? null
+
+    const acceptedIds = rows.filter((r) => r.status === 'accepted').map(otherOf)
+    const rooms = await currentRooms(service, acceptedIds)
+
+    const friends: Friend[] = rows
+      .filter((r) => r.status === 'accepted')
+      .map((r) => ({ id: otherOf(r), name: name(otherOf(r)), avatar: avatar(otherOf(r)), roomCode: rooms[otherOf(r)] ?? null }))
+    const incoming: Member[] = rows
+      .filter((r) => r.status === 'pending' && r.requested_by !== user.id)
+      .map((r) => ({ id: otherOf(r), name: name(otherOf(r)), avatar: avatar(otherOf(r)), status: 'incoming' as const }))
+    const outgoing: Member[] = rows
+      .filter((r) => r.status === 'pending' && r.requested_by === user.id)
+      .map((r) => ({ id: otherOf(r), name: name(otherOf(r)), avatar: avatar(otherOf(r)), status: 'outgoing' as const }))
+    return { friends, incoming, outgoing }
+  } catch {
+    return empty
+  }
+}
+
+/** Directory of other members, with the caller's relationship to each. */
+export async function listMembers(query?: string): Promise<Member[]> {
+  try {
+    const user = await requireUser()
+    const service = createServiceClient()
+    let q = service.from('profiles').select('*').neq('id', user.id).order('updated_at', { ascending: false }).limit(60)
+    if (query && query.trim()) q = q.ilike('display_name', `%${query.trim()}%`)
+    const { data: profs, error } = await q
+    if (error || !profs) return []
+
+    const { data: rels } = await service
+      .from('friendships')
+      .select('*')
+      .or(`user_low.eq.${user.id},user_high.eq.${user.id}`)
+    const relOf = (otherId: string): FriendStatus => {
+      const [low, high] = pair(user.id, otherId)
+      const r = (rels ?? []).find((x) => x.user_low === low && x.user_high === high)
+      if (!r) return 'none'
+      if (r.status === 'accepted') return 'friends'
+      return r.requested_by === user.id ? 'outgoing' : 'incoming'
+    }
+    return profs.map((x) => ({ id: x.id, name: x.display_name, avatar: x.avatar_url, status: relOf(x.id) }))
+  } catch {
+    return []
+  }
+}
+
+/** Send (or auto-accept a reciprocal) friend request. */
+export async function sendFriendRequest(targetId: string) {
+  const user = await requireUser()
+  if (targetId === user.id) throw new Error('본인에게는 보낼 수 없습니다.')
+  const service = createServiceClient()
+  const [low, high] = pair(user.id, targetId)
+  const { data: existing } = await service.from('friendships').select('*').eq('user_low', low).eq('user_high', high).maybeSingle()
+  if (existing) {
+    // A pending request from the other person → accept it.
+    if (existing.status === 'pending' && existing.requested_by !== user.id) {
+      await service.from('friendships').update({ status: 'accepted' }).eq('user_low', low).eq('user_high', high)
+    }
+    return { ok: true }
+  }
+  const { error } = await service.from('friendships').insert({ user_low: low, user_high: high, status: 'pending', requested_by: user.id })
+  if (error) throw new Error('친구 요청 실패 — 마이그레이션 0010을 먼저 적용하세요.')
+  return { ok: true }
+}
+
+/** Accept or decline an incoming request. */
+export async function respondFriend(otherId: string, accept: boolean) {
+  const user = await requireUser()
+  const service = createServiceClient()
+  const [low, high] = pair(user.id, otherId)
+  if (accept) {
+    await service.from('friendships').update({ status: 'accepted' }).eq('user_low', low).eq('user_high', high)
+  } else {
+    await service.from('friendships').delete().eq('user_low', low).eq('user_high', high)
+  }
+  return { ok: true }
+}
+
+/** Remove a friend (or cancel an outgoing request). */
+export async function removeFriend(otherId: string) {
+  const user = await requireUser()
+  const service = createServiceClient()
+  const [low, high] = pair(user.id, otherId)
+  await service.from('friendships').delete().eq('user_low', low).eq('user_high', high)
+  return { ok: true }
+}
+
 export interface OpenRoom {
   id: string
   code: string

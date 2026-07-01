@@ -217,6 +217,21 @@ export const EN: Record<string, string> = {
   '최종 정산 완료': 'Final settlement done',
   '최종 정산하고 방 종료': 'Finalize & close room',
 
+  // --- Friends / members ---
+  '친구': 'Friends',
+  '받은 요청': 'Requests',
+  '수락': 'Accept',
+  '거절': 'Decline',
+  '아직 친구가 없어요. 아래에서 찾아보세요.': 'No friends yet — find some below.',
+  '게임 중': 'In game',
+  '오프라인': 'Offline',
+  '이름으로 멤버 찾기…': 'Find members by name…',
+  '일치하는 멤버가 없어요.': 'No matching members.',
+  '친구 추가': 'Add friend',
+  '요청됨': 'Requested',
+  '친구 요청 보냄': 'Friend request sent',
+  '친구 추가됨': 'Friend added',
+
   // --- Leave confirm ---
   '정말 나가시겠습니까?': 'Leave the room?',
 
