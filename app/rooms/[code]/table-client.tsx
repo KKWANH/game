@@ -96,20 +96,9 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
     return () => window.removeEventListener('pointerdown', unlock)
   }, [])
 
-  // Best-effort free-my-seat on tab close so abandoned rooms don't linger as open.
-  const mySeatId = mySeat?.id
-  useEffect(() => {
-    if (!mySeatId) return
-    const onHide = () => {
-      try {
-        navigator.sendBeacon('/api/leave', new Blob([JSON.stringify({ seatId: mySeatId })], { type: 'application/json' }))
-      } catch {
-        // ignore
-      }
-    }
-    window.addEventListener('pagehide', onHide)
-    return () => window.removeEventListener('pagehide', onHide)
-  }, [mySeatId])
+  // NOTE: no pagehide/beacon auto-leave — it also fires on a simple refresh and
+  // would drop your seat. Abandoned rooms are instead swept when anyone views the
+  // lobby (listOpenRooms closes zero-human rooms) plus the explicit 나가기 button.
 
   // Drive AI seats. During (simultaneous) betting, fire whenever any AI hand
   // hasn't bet yet; during player turns, fire when the active hand is an AI's.
@@ -165,6 +154,7 @@ export function TableClient({ roomId, meId }: { roomId: string; meId: string }) 
         playerCount={playerSeats.length}
         maxSeats={maxSeats}
         onLeave={async () => {
+          if (!confirm(t('정말 나가시겠습니까?'))) return
           if (mySeat) await leaveSeat(mySeat.id).catch(() => {})
           window.location.href = '/blackjack'
         }}

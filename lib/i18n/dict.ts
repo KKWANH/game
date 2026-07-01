@@ -132,7 +132,6 @@ export const EN: Record<string, string> = {
   '🤖 AI 추가': '🤖 Add AI',
   'AI 내보내기': 'Remove AI',
   '⚙ 방 설정': '⚙ Settings',
-  '정산 / 재배분': 'Settle / rebalance',
   '호스트': 'Host',
 
   // --- Account ---
@@ -174,6 +173,78 @@ export const EN: Record<string, string> = {
   '나: ': 'Me: ',
   '에게 보낼 것': ' to pay',
   '에게 받을 것': ' to receive',
+
+  // --- Settlement screen ---
+  '최종 정산': 'Final settlement',
+  '기준': 'basis',
+  '바이인': 'Buy-in',
+  '잔액': 'Balance',
+  '코인': 'coins',
+  '정산 송금': 'Transfers',
+  '서로 정산할 차액이 없습니다.': 'No balances to settle.',
+
+  // --- Admin ---
+  '← 홈': '← Home',
+  '빈 방 정리 완료': 'Empty rooms cleared',
+  '빈 방 모두 닫기': 'Close all empty',
+  '방': 'Room',
+  '상태': 'Status',
+  '인원': 'Players',
+  '생성': 'Created',
+  '관리': 'Manage',
+  '방이 없습니다.': 'No rooms.',
+  '방 닫음': 'Room closed',
+  '방 삭제됨': 'Room deleted',
+  '불러오기 실패': 'Failed to load',
+  '삭제': 'Delete',
+
+  // --- Host settlement panel ---
+  '정산 / 재배분': 'Settle / rebalance',
+  '내역 불러오기 실패': 'Failed to load history',
+  '현실 머니 — 코인 환율': 'Real money — coin rate',
+  '적용': 'Apply',
+  '제안 송금': 'Suggested transfers',
+  '칩 이체 (재배분)': 'Transfer chips (rebalance)',
+  '보내는 사람': 'From',
+  '받는 사람': 'To',
+  '이체 완료': 'Transferred',
+  '이체': 'Send',
+  '전원 리밸런스': 'Rebalance everyone',
+  '바이인 / 충전 내역': 'Buy-in / top-up history',
+  '충전/조정': 'top-up/adj',
+  '중간정산 기록 완료 — 모두에게 표시됩니다': 'Interim settlement recorded — shown to everyone',
+  '💰 중간정산 확정 (방 유지)': '💰 Record interim (keep room)',
+  '최종 정산 완료': 'Final settlement done',
+  '최종 정산하고 방 종료': 'Finalize & close room',
+
+  // --- Leave confirm ---
+  '정말 나가시겠습니까?': 'Leave the room?',
+
+  // --- Room settings panel ---
+  '방 설정': 'Room settings',
+  '닫기': 'Close',
+  '⏸ 멈춤': '⏸ Paused',
+  '▶ 진행 중': '▶ Running',
+  '멈추면 다음 판이 시작되지 않아 설정을 바꿀 수 있어요.':
+    'While paused, no new round starts so you can change settings.',
+  '재개': 'Resume',
+  '멈춤': 'Pause',
+  '🎩 내가 딜러(뱅크)': "🎩 I'm the dealer (bank)",
+  '🙂 플레이어': '🙂 Player',
+  '딜러가 되면 뱅크 역할만 맡고 손패는 자동 진행돼요. (다음 판 적용)':
+    'As dealer you only hold the bank; the hand auto-plays. (next round)',
+  '플레이어로': 'To player',
+  '딜러 되기': 'Become dealer',
+  '설정 저장 — 다음 판부터 적용': 'Saved — applies next round',
+  '설정 저장 (다음 판 적용)': 'Save settings (next round)',
+  '현실 머니 환율': 'Real-money rate',
+  '현재': 'Now',
+  '환율 적용': 'Rate applied',
+  '환율 저장': 'Save rate',
+  '방을 멈췄습니다': 'Room paused',
+  '게임을 재개합니다': 'Resuming',
+  '다음 판부터 딜러(뱅크)가 됩니다': "You'll be the dealer (bank) next round",
+  '다음 판부터 플레이어로 돌아갑니다': 'Back to player next round',
 
   // --- Language toggle ---
   '언어': 'Language',

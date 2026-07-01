@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { formatChips, cn } from '@/lib/utils'
 import { formatMoney, describeStake, CURRENCIES } from '@/lib/money'
+import { useT, useLocale } from '@/lib/i18n/provider'
 import {
   interimSettlement,
   recordInterimSettlement,
@@ -32,13 +33,15 @@ export function HostSettlementPanel({
 }) {
   const [standings, setStandings] = useState<SettlementResult | null>(null)
   const [busy, setBusy] = useState(false)
+  const t = useT()
+  const en = useLocale() === 'en'
   const playerSeats = seats.filter((s) => s.status !== 'left')
 
   const refresh = async () => {
     try {
       setStandings(await interimSettlement(roomId))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '불러오기 실패')
+      toast.error(e instanceof Error ? e.message : t('불러오기 실패'))
     }
   }
   useEffect(() => {
@@ -53,7 +56,7 @@ export function HostSettlementPanel({
       toast.success(ok)
       await refresh()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '실패')
+      toast.error(e instanceof Error ? e.message : t('실패'))
     } finally {
       setBusy(false)
     }
@@ -88,7 +91,7 @@ export function HostSettlementPanel({
     try {
       setLedger(await roomLedgerSummary(roomId))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '내역 불러오기 실패')
+      toast.error(e instanceof Error ? e.message : t('내역 불러오기 실패'))
     }
   }
 
@@ -115,18 +118,18 @@ export function HostSettlementPanel({
         >
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-extrabold">
-              <span className="shimmer-gold">정산 / 재배분</span>
+              <span className="shimmer-gold">{t('정산 / 재배분')}</span>
             </h2>
             <Button variant="ghost" size="sm" onClick={onClose}>
-              닫기 ✕
+              {t('닫기')} ✕
             </Button>
           </div>
 
           {/* Real-money stake: unit_chips coins = unit_amount of currency. */}
           <div className="mb-4 space-y-2 rounded-2xl border border-gold/30 bg-gold/5 p-3">
-            <div className="flex items-center justify-between">
-              <Label>현실 머니 — 코인 환율</Label>
-              <span className="text-xs text-gold">현재 {describeStake(money)}</span>
+            <div className="flex flex-wrap items-center justify-between gap-1">
+              <Label>{t('현실 머니 — 코인 환율')}</Label>
+              <span className="text-xs text-gold">{t('현재')} {describeStake(money)}</span>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <Input
@@ -136,7 +139,7 @@ export function HostSettlementPanel({
                 min={1}
                 onChange={(e) => setUnitChips(Number(e.target.value))}
               />
-              <span className="text-sm text-muted-foreground">코인 =</span>
+              <span className="text-sm text-muted-foreground">{t('코인 =')}</span>
               <Input
                 type="number"
                 className="w-20"
@@ -168,11 +171,11 @@ export function HostSettlementPanel({
                 onClick={() =>
                   run(
                     () => setRoomMoney(roomId, { currency, unitChips, unitAmount }),
-                    `환율 적용: ${unitChips}코인 = ${unitAmount} ${currency}`
+                    `${t('환율 적용')}: ${unitChips}${t('코인')} = ${unitAmount} ${currency}`
                   )
                 }
               >
-                적용
+                {t('적용')}
               </Button>
             </div>
           </div>
@@ -186,7 +189,7 @@ export function HostSettlementPanel({
               >
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{n.displayName}</span>
-                  {n.isDealer && <span className="text-xs text-gold">딜러</span>}
+                  {n.isDealer && <span className="text-xs text-gold">{t('딜러')}</span>}
                   {n.isAi && (
                     <span className="rounded bg-neon-cyan/15 px-1.5 py-0.5 text-[10px] font-bold text-neon-cyan">
                       🤖 AI
@@ -220,24 +223,28 @@ export function HostSettlementPanel({
 
           {standings && standings.aiNet !== 0 && (
             <p className="mb-3 rounded-xl bg-neon-cyan/10 px-3 py-2 text-xs leading-relaxed text-neon-cyan">
-              🤖 AI 손익 {standings.aiNet > 0 ? '+' : ''}
-              {formatChips(standings.aiNet)}은(는) 실제 사람이 아니므로 사람{' '}
-              {nets.filter((n) => !n.isAi).length}명에게 공평하게 나눠 아래 송금에 반영했습니다.
+              {en
+                ? `🤖 AI's net ${standings.aiNet > 0 ? '+' : ''}${formatChips(standings.aiNet)} isn't a real person, so it's split evenly among the ${nets.filter((n) => !n.isAi).length} humans in the transfers below.`
+                : `🤖 AI 손익 ${standings.aiNet > 0 ? '+' : ''}${formatChips(standings.aiNet)}은(는) 실제 사람이 아니므로 사람 ${nets.filter((n) => !n.isAi).length}명에게 공평하게 나눠 아래 송금에 반영했습니다.`}
             </p>
           )}
 
           {standings && !nets.some((n) => n.isDealer) && (
             <p className="mb-3 rounded-xl bg-neon-cyan/10 px-3 py-2 text-xs leading-relaxed text-neon-cyan">
-              🤖 AI 딜러(하우스) 게임 — 봇과의 공동 손익은 빼고 친구끼리 <b>차이만</b> 정산합니다.
+              {en ? (
+                <>🤖 AI-dealer (house) game — set aside the shared result vs the bot; friends settle <b>only the differences</b>.</>
+              ) : (
+                <>🤖 AI 딜러(하우스) 게임 — 봇과의 공동 손익은 빼고 친구끼리 <b>차이만</b> 정산합니다.</>
+              )}
             </p>
           )}
 
           {standings && standings.transfers.length > 0 && (
             <div className="mb-5 space-y-1 rounded-2xl bg-black/20 p-3">
-              <div className="text-xs font-bold uppercase tracking-widest text-gold">제안 송금</div>
-              {standings.transfers.map((t, i) => {
-                const f = nets.find((n) => n.seatId === t.fromSeat)
-                const to = nets.find((n) => n.seatId === t.toSeat)
+              <div className="text-xs font-bold uppercase tracking-widest text-gold">{t('제안 송금')}</div>
+              {standings.transfers.map((tx, i) => {
+                const f = nets.find((n) => n.seatId === tx.fromSeat)
+                const to = nets.find((n) => n.seatId === tx.toSeat)
                 return (
                   <div key={i} className="flex justify-between text-sm">
                     <span>
@@ -245,9 +252,9 @@ export function HostSettlementPanel({
                       <span className="text-accent">{to?.displayName}</span>
                     </span>
                     <span className="font-bold text-gold">
-                      {won(t.amount)}
+                      {won(tx.amount)}
                       <span className="ml-1 text-[11px] font-normal opacity-60">
-                        ({formatChips(t.amount)}코인)
+                        ({formatChips(tx.amount)}{t('코인')})
                       </span>
                     </span>
                   </div>
@@ -258,11 +265,11 @@ export function HostSettlementPanel({
 
           {/* Transfer */}
           <div className="mb-4 space-y-2 rounded-2xl border border-border p-3">
-            <Label>칩 이체 (재배분)</Label>
+            <Label>{t('칩 이체 (재배분)')}</Label>
             <div className="flex flex-wrap items-center gap-2">
-              <SeatSelect seats={playerSeats} value={fromSeat} onChange={setFromSeat} placeholder="보내는 사람" />
+              <SeatSelect seats={playerSeats} value={fromSeat} onChange={setFromSeat} placeholder={t('보내는 사람')} />
               <span className="text-muted-foreground">→</span>
-              <SeatSelect seats={playerSeats} value={toSeat} onChange={setToSeat} placeholder="받는 사람" />
+              <SeatSelect seats={playerSeats} value={toSeat} onChange={setToSeat} placeholder={t('받는 사람')} />
               <Input
                 type="number"
                 className="w-24"
@@ -274,9 +281,9 @@ export function HostSettlementPanel({
                 size="sm"
                 variant="primary"
                 disabled={busy || !fromSeat || !toSeat}
-                onClick={() => run(() => transferChips(roomId, fromSeat, toSeat, amount), '이체 완료')}
+                onClick={() => run(() => transferChips(roomId, fromSeat, toSeat, amount), t('이체 완료'))}
               >
-                이체
+                {t('이체')}
               </Button>
             </div>
           </div>
@@ -284,7 +291,7 @@ export function HostSettlementPanel({
           {/* Rebalance */}
           <div className="mb-5 flex flex-wrap items-end gap-2 rounded-2xl border border-border p-3">
             <div className="space-y-1">
-              <Label>전원 리밸런스</Label>
+              <Label>{t('전원 리밸런스')}</Label>
               <Input
                 type="number"
                 className="w-32"
@@ -297,9 +304,9 @@ export function HostSettlementPanel({
               size="sm"
               variant="secondary"
               disabled={busy}
-              onClick={() => run(() => rebalanceChips(roomId, target), `전원 ${formatChips(target)}로 리셋`)}
+              onClick={() => run(() => rebalanceChips(roomId, target), en ? `Reset everyone to ${formatChips(target)}` : `전원 ${formatChips(target)}로 리셋`)}
             >
-              모두 {formatChips(target)}로 맞추기
+              {en ? `Set all to ${formatChips(target)}` : `모두 ${formatChips(target)}로 맞추기`}
             </Button>
           </div>
 
@@ -309,7 +316,7 @@ export function HostSettlementPanel({
               onClick={toggleLedger}
               className="flex w-full items-center justify-between text-sm font-semibold"
             >
-              <span>바이인 / 충전 내역</span>
+              <span>{t('바이인 / 충전 내역')}</span>
               <span className="text-muted-foreground">{ledger ? '▲' : '▼'}</span>
             </button>
             {ledger && (
@@ -321,10 +328,10 @@ export function HostSettlementPanel({
                       {l.isAi && <span className="text-[10px] text-neon-cyan">🤖</span>}
                     </span>
                     <span className="text-muted-foreground">
-                      바이인 <span className="font-semibold text-foreground">{formatChips(l.buyIn)}</span>
+                      {t('바이인')} <span className="font-semibold text-foreground">{formatChips(l.buyIn)}</span>
                       {l.topUps !== 0 && (
                         <>
-                          {' · 충전/조정 '}
+                          {' · '}{t('충전/조정')}{' '}
                           <span className={cn('font-semibold', l.topUps > 0 ? 'text-accent' : 'text-destructive')}>
                             {l.topUps > 0 ? '+' : ''}
                             {formatChips(l.topUps)}
@@ -344,9 +351,9 @@ export function HostSettlementPanel({
             size="lg"
             className="mb-2 w-full"
             disabled={busy}
-            onClick={() => run(() => recordInterimSettlement(roomId), '중간정산 기록 완료 — 모두에게 표시됩니다')}
+            onClick={() => run(() => recordInterimSettlement(roomId), t('중간정산 기록 완료 — 모두에게 표시됩니다'))}
           >
-            💰 중간정산 확정 (방 유지)
+            {t('💰 중간정산 확정 (방 유지)')}
           </Button>
 
           <Button
@@ -355,12 +362,12 @@ export function HostSettlementPanel({
             className="w-full"
             disabled={busy}
             onClick={() => {
-              if (confirm('최종 정산하고 방을 종료할까요?')) {
-                run(() => computeSettlement(roomId), '최종 정산 완료')
+              if (confirm(en ? 'Finalize settlement and close the room?' : '최종 정산하고 방을 종료할까요?')) {
+                run(() => computeSettlement(roomId), t('최종 정산 완료'))
               }
             }}
           >
-            최종 정산하고 방 종료
+            {t('최종 정산하고 방 종료')}
           </Button>
         </motion.div>
       </motion.div>

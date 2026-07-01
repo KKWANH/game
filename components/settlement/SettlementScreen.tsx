@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Panel } from '@/components/ui/input'
 import { formatChips, cn } from '@/lib/utils'
 import { formatMoney, describeStake, DEFAULT_MONEY, type MoneyConfig } from '@/lib/money'
+import { useT, useLocale } from '@/lib/i18n/provider'
 import type { SettlementRow } from '@/lib/supabase/types'
 
 /** Reconstruct the stake from a stored settlement, tolerating older rows that
@@ -24,6 +25,8 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
     settlement.aiNet ?? nets.filter((n) => n.isAi).reduce((s, n) => s + n.net, 0)
   const humanCount = nets.filter((n) => !n.isAi).length
   const money = moneyFromSettlement(settlement)
+  const tt = useT()
+  const en = useLocale() === 'en'
   // No dealer seat → the dealer was a virtual AI house (players pooled the result).
   const aiDealerGame = !nets.some((n) => n.isDealer)
 
@@ -34,9 +37,9 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
       className="mx-auto w-full max-w-2xl space-y-6 p-4"
     >
       <h1 className="text-center text-3xl font-extrabold">
-        <span className="shimmer-gold">최종 정산</span>
+        <span className="shimmer-gold">{tt('최종 정산')}</span>
       </h1>
-      <p className="-mt-4 text-center text-sm text-gold">{describeStake(money)} 기준</p>
+      <p className="-mt-4 text-center text-sm text-gold">{describeStake(money)} {tt('기준')}</p>
 
       <Panel className="divide-y divide-border">
         {nets.map((n) => (
@@ -51,7 +54,7 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
                 )}
               </div>
               <div className="text-xs text-muted-foreground">
-                바이인 {formatChips(n.buyIn)} → 잔액 {formatChips(n.stack)}
+                {tt('바이인')} {formatChips(n.buyIn)} → {tt('잔액')} {formatChips(n.stack)}
               </div>
             </div>
             <div
@@ -66,7 +69,7 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
               </div>
               <div className="text-xs font-medium opacity-70">
                 {n.net > 0 ? '+' : ''}
-                {formatChips(n.net)}코인
+                {formatChips(n.net)}{tt('코인')}
               </div>
             </div>
           </div>
@@ -75,22 +78,25 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
 
       {aiNet !== 0 && humanCount > 0 && (
         <p className="rounded-xl bg-neon-cyan/10 px-4 py-3 text-center text-sm leading-relaxed text-neon-cyan">
-          🤖 AI 손익 {aiNet > 0 ? '+' : ''}
-          {formatChips(aiNet)}코인은(는) 실제 사람이 아니므로 사람 {humanCount}명에게 공평하게 나눠
-          아래 송금에 반영했습니다.
+          {en
+            ? `🤖 AI's net of ${aiNet > 0 ? '+' : ''}${formatChips(aiNet)} coins isn't a real person, so it was split evenly among the ${humanCount} humans in the transfers below.`
+            : `🤖 AI 손익 ${aiNet > 0 ? '+' : ''}${formatChips(aiNet)}코인은(는) 실제 사람이 아니므로 사람 ${humanCount}명에게 공평하게 나눠 아래 송금에 반영했습니다.`}
         </p>
       )}
 
       {aiDealerGame && (
         <p className="rounded-xl bg-neon-cyan/10 px-4 py-3 text-center text-sm leading-relaxed text-neon-cyan">
-          🤖 AI 딜러(하우스) 게임 — 봇과의 공동 손익은 실제 돈이 아니므로, 친구끼리{' '}
-          <b>서로의 차이만</b> 정산합니다 (모두 평균에 맞춰 정산).
+          {en ? (
+            <>🤖 AI-dealer (house) game — the shared win/loss vs the bot isn&apos;t real money, so friends settle <b>only the differences</b> (everyone to the group average).</>
+          ) : (
+            <>🤖 AI 딜러(하우스) 게임 — 봇과의 공동 손익은 실제 돈이 아니므로, 친구끼리 <b>서로의 차이만</b> 정산합니다 (모두 평균에 맞춰 정산).</>
+          )}
         </p>
       )}
 
       {settlement.transfers.length > 0 ? (
         <Panel className="space-y-2 p-4">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-gold">정산 송금</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-gold">{tt('정산 송금')}</h2>
           {settlement.transfers.map((t, i) => {
             const from = settlement.net_by_seat.find((s) => s.seatId === t.fromSeat)
             const to = settlement.net_by_seat.find((s) => s.seatId === t.toSeat)
@@ -103,16 +109,14 @@ export function SettlementScreen({ settlement }: { settlement: SettlementRow }) 
                 </span>
                 <span className="font-bold tabular-nums text-gold">
                   {formatMoney(t.amount, money)}
-                  <span className="ml-1 text-xs font-normal opacity-60">({formatChips(t.amount)}코인)</span>
+                  <span className="ml-1 text-xs font-normal opacity-60">({formatChips(t.amount)}{tt('코인')})</span>
                 </span>
               </div>
             )
           })}
         </Panel>
       ) : (
-        <p className="text-center text-sm text-muted-foreground">
-          서로 정산할 차액이 없습니다.
-        </p>
+        <p className="text-center text-sm text-muted-foreground">{tt('서로 정산할 차액이 없습니다.')}</p>
       )}
     </motion.div>
   )

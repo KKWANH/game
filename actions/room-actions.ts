@@ -323,17 +323,25 @@ export async function setDealerRole(roomId: string, beDealer: boolean) {
 }
 
 const RoomSettingsSchema = z.object({
+  name: z.string().trim().min(1).max(40).optional(),
   minBet: z.coerce.number().int().min(1).optional(),
   maxBet: z.coerce.number().int().min(1).optional(),
   numDecks: z.coerce.number().int().min(1).max(8).optional(),
   turnTimer: z.coerce.number().int().min(5).max(120).optional(),
 })
 
-/** Host updates game settings — takes effect on the NEXT round (each round
- *  snapshots its own config, so a live round is never disturbed). */
+/** Host updates room settings. The room name applies immediately; game settings
+ *  (bets/decks/timer) take effect on the NEXT round (each round snapshots its
+ *  own config, so a live round is never disturbed). */
 export async function updateRoomSettings(roomId: string, input: z.input<typeof RoomSettingsSchema>) {
   const service = await requireHost(roomId)
   const p = RoomSettingsSchema.parse(input)
+
+  if (p.name != null) {
+    const { error } = await service.from('rooms').update({ name: p.name }).eq('id', roomId)
+    if (error) throw new Error('이름 저장 실패: ' + error.message)
+  }
+
   const patch: Partial<{ min_bet: number; max_bet: number; num_decks: number; turn_timer_seconds: number }> = {}
   if (p.minBet != null) patch.min_bet = p.minBet
   if (p.maxBet != null) patch.max_bet = p.maxBet
@@ -342,8 +350,9 @@ export async function updateRoomSettings(roomId: string, input: z.input<typeof R
   if (patch.min_bet != null && patch.max_bet != null && patch.min_bet > patch.max_bet) {
     throw new Error('최소 베팅이 최대 베팅보다 큽니다.')
   }
-  if (Object.keys(patch).length === 0) return { ok: true }
-  const { error } = await service.from('room_config').update(patch).eq('room_id', roomId)
-  if (error) throw new Error('설정 저장 실패: ' + error.message)
+  if (Object.keys(patch).length > 0) {
+    const { error } = await service.from('room_config').update(patch).eq('room_id', roomId)
+    if (error) throw new Error('설정 저장 실패: ' + error.message)
+  }
   return { ok: true }
 }
