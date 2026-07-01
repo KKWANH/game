@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getUser } from '@/lib/supabase/server'
 import { AccountClient } from '@/components/account/AccountClient'
 import { isAdmin } from '@/lib/admin'
+import { getStats } from '@/actions/social-actions'
 
 export default async function AccountPage() {
   const user = await getUser()
@@ -13,6 +14,7 @@ export default async function AccountPage() {
     (meta.name as string) ||
     user.email?.split('@')[0] ||
     '플레이어'
+  const stats = await getStats()
 
   return (
     <AccountClient
@@ -20,6 +22,7 @@ export default async function AccountPage() {
       name={name}
       avatarUrl={(meta.avatar_url as string) || (meta.picture as string) || null}
       admin={isAdmin(user.email)}
+      stats={stats}
     />
   )
 }

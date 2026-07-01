@@ -329,8 +329,54 @@ async function runDealerSettle(service: Service, roundId: string, dealerHandId: 
   try {
     await commitRound(service, roundId, state.round.version, patch)
   } catch (e) {
-    if (e instanceof VersionConflict) return
+    if (e instanceof VersionConflict) return // another client settled — they count the stats
     throw e
+  }
+  // Only the client that won the settle commit reaches here → count stats once.
+  await applyRoundStats(service, roundId)
+}
+
+/** Accumulate lifetime per-account stats from a just-settled round. Best-effort:
+ *  never breaks the game loop (e.g. before migration 0011). AI seats are skipped. */
+async function applyRoundStats(service: Service, roundId: string) {
+  try {
+    const { data: hands } = await service
+      .from('hands')
+      .select('seat_id, is_dealer, outcome, status, payout, bet_amount')
+      .eq('round_id', roundId)
+    const playerHands = (hands ?? []).filter((h) => !h.is_dealer && h.seat_id)
+    if (playerHands.length === 0) return
+    const seatIds = Array.from(new Set(playerHands.map((h) => h.seat_id!)))
+    const { data: seats } = await service.from('seats').select('id, user_id, is_ai').in('id', seatIds)
+    const userOf = new Map((seats ?? []).map((s) => [s.id, s.is_ai ? null : s.user_id]))
+
+    type Agg = { hands: number; wins: number; losses: number; pushes: number; blackjacks: number; net: number }
+    const agg = new Map<string, Agg>()
+    for (const h of playerHands) {
+      const uid = userOf.get(h.seat_id!)
+      if (!uid) continue // AI seat or unknown
+      const a = agg.get(uid) ?? { hands: 0, wins: 0, losses: 0, pushes: 0, blackjacks: 0, net: 0 }
+      a.hands += 1
+      if (h.outcome === 'win' || h.outcome === 'blackjack') a.wins += 1
+      else if (h.outcome === 'push') a.pushes += 1
+      else a.losses += 1 // lose / surrender / busted
+      if (h.outcome === 'blackjack') a.blackjacks += 1
+      a.net += (h.payout ?? 0) - h.bet_amount
+      agg.set(uid, a)
+    }
+    for (const [uid, a] of agg) {
+      await service.rpc('bump_player_stats', {
+        p_user_id: uid,
+        p_hands: a.hands,
+        p_wins: a.wins,
+        p_losses: a.losses,
+        p_pushes: a.pushes,
+        p_blackjacks: a.blackjacks,
+        p_net: a.net,
+      })
+    }
+  } catch {
+    // stats are best-effort — ignore (e.g. tables/RPC missing pre-0011)
   }
 }
 

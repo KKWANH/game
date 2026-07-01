@@ -30,17 +30,12 @@ export async function fetchRoomSnapshot(
   supabase: BrowserDbClient,
   roomId: string
 ): Promise<RoomSnapshot> {
-  const { data: room } = await supabase.from('rooms').select('*').eq('id', roomId).maybeSingle()
-  const { data: config } = await supabase
-    .from('room_config')
-    .select('*')
-    .eq('room_id', roomId)
-    .maybeSingle()
-  const { data: seats } = await supabase
-    .from('seats')
-    .select('*')
-    .eq('room_id', roomId)
-    .order('seat_index')
+  // Independent reads run in parallel to keep each reconcile snappy.
+  const [{ data: room }, { data: config }, { data: seats }] = await Promise.all([
+    supabase.from('rooms').select('*').eq('id', roomId).maybeSingle(),
+    supabase.from('room_config').select('*').eq('room_id', roomId).maybeSingle(),
+    supabase.from('seats').select('*').eq('room_id', roomId).order('seat_index'),
+  ])
 
   let round: GameRoundRow | null = null
   if (room?.current_round_id) {
@@ -69,32 +64,18 @@ export async function fetchRoomSnapshot(
     }
   }
 
-  let settlement: SettlementRow | null = null
-  if (room?.status === 'settled') {
-    const { data } = await supabase
-      .from('settlements')
-      .select('*')
-      .eq('room_id', roomId)
-      .order('computed_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    settlement = data
-  }
-
-  // Latest mid-game settlement so everyone sees "중간 정산 완료". Tolerate the
-  // 0007 `kind` column not existing yet (error → just no interim banner).
-  let interimSettlement: SettlementRow | null = null
-  if (room && room.status !== 'settled') {
-    const { data, error } = await supabase
-      .from('settlements')
-      .select('*')
-      .eq('room_id', roomId)
-      .eq('kind', 'interim')
-      .order('computed_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (!error) interimSettlement = data
-  }
+  // Final settlement (when settled) and latest interim (otherwise) — one or the
+  // other, fetched in parallel. Interim tolerates the 0007 `kind` column absence.
+  const [finalRes, interimRes] = await Promise.all([
+    room?.status === 'settled'
+      ? supabase.from('settlements').select('*').eq('room_id', roomId).order('computed_at', { ascending: false }).limit(1).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    room && room.status !== 'settled'
+      ? supabase.from('settlements').select('*').eq('room_id', roomId).eq('kind', 'interim').order('computed_at', { ascending: false }).limit(1).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ])
+  const settlement: SettlementRow | null = finalRes.data
+  const interimSettlement: SettlementRow | null = interimRes.error ? null : interimRes.data
 
   return {
     room: room ?? null,

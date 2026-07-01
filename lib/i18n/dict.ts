@@ -143,6 +143,15 @@ export const EN: Record<string, string> = {
   '이름을 저장했습니다.': 'Name saved.',
   '저장 실패': 'Save failed',
   '관리자': 'Admin',
+  '내 통계': 'My stats',
+  '아직 기록이 없어요.': 'No games played yet.',
+  '판수': 'Hands',
+  '승률': 'Win rate',
+  '순손익': 'Net',
+  '승': 'W',
+  '패': 'L',
+  '무': 'P',
+  '블랙잭': 'BJ',
 
   // --- Result badges ---
   WIN: 'WIN',

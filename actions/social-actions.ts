@@ -16,6 +16,34 @@ function pair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a]
 }
 
+export interface PlayerStats {
+  hands: number
+  wins: number
+  losses: number
+  pushes: number
+  blackjacks: number
+  net: number
+}
+
+const ZERO_STATS: PlayerStats = { hands: 0, wins: 0, losses: 0, pushes: 0, blackjacks: 0, net: 0 }
+
+/** Lifetime stats for the caller (or a given user). Tolerates 0011 absent. */
+export async function getStats(userId?: string): Promise<PlayerStats> {
+  try {
+    const user = await requireUser()
+    const service = createServiceClient()
+    const { data, error } = await service
+      .from('player_stats')
+      .select('*')
+      .eq('user_id', userId ?? user.id)
+      .maybeSingle()
+    if (error || !data) return ZERO_STATS
+    return { hands: data.hands, wins: data.wins, losses: data.losses, pushes: data.pushes, blackjacks: data.blackjacks, net: data.net }
+  } catch {
+    return ZERO_STATS
+  }
+}
+
 /** Upsert the caller's public profile (called on lobby load). Best-effort. */
 export async function ensureProfile() {
   try {

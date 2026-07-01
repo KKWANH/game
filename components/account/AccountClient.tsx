@@ -6,19 +6,23 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Panel } from '@/components/ui/input'
 import { updateDisplayName, signOut } from '@/actions/auth-actions'
+import type { PlayerStats } from '@/actions/social-actions'
 import { useT } from '@/lib/i18n/provider'
 import { LanguageToggle } from '@/components/i18n/LanguageToggle'
+import { cn, formatChips } from '@/lib/utils'
 
 export function AccountClient({
   email,
   name,
   avatarUrl,
   admin,
+  stats,
 }: {
   email: string
   name: string
   avatarUrl: string | null
   admin: boolean
+  stats: PlayerStats
 }) {
   const [displayName, setDisplayName] = useState(name)
   const [pending, setPending] = useState(false)
@@ -71,6 +75,44 @@ export function AccountClient({
         )}
       </Panel>
 
+      {/* Lifetime stats */}
+      <Panel className="space-y-3 p-5">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-gold">{t('내 통계')}</h2>
+        {stats.hands === 0 ? (
+          <p className="py-2 text-center text-sm text-muted-foreground">{t('아직 기록이 없어요.')}</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <Stat label={t('판수')} value={formatChips(stats.hands)} />
+              <Stat
+                label={t('승률')}
+                value={`${Math.round((stats.wins / Math.max(1, stats.wins + stats.losses)) * 100)}%`}
+                accent
+              />
+              <Stat
+                label={t('순손익')}
+                value={`${stats.net > 0 ? '+' : ''}${formatChips(stats.net)}`}
+                tone={stats.net > 0 ? 'up' : stats.net < 0 ? 'down' : undefined}
+              />
+            </div>
+            <div className="flex justify-center gap-4 text-sm text-muted-foreground">
+              <span>
+                {t('승')} <b className="text-accent">{stats.wins}</b>
+              </span>
+              <span>
+                {t('패')} <b className="text-destructive">{stats.losses}</b>
+              </span>
+              <span>
+                {t('무')} <b className="text-foreground">{stats.pushes}</b>
+              </span>
+              <span>
+                {t('블랙잭')} <b className="text-gold">{stats.blackjacks}</b>
+              </span>
+            </div>
+          </>
+        )}
+      </Panel>
+
       <Panel className="space-y-3 p-5">
         <div className="space-y-1">
           <Label>{t('표시 이름')}</Label>
@@ -99,5 +141,21 @@ export function AccountClient({
         </Button>
       </form>
     </main>
+  )
+}
+
+function Stat({ label, value, accent, tone }: { label: string; value: string; accent?: boolean; tone?: 'up' | 'down' }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card/50 py-3">
+      <div
+        className={cn(
+          'text-xl font-extrabold tabular-nums',
+          tone === 'up' ? 'text-accent' : tone === 'down' ? 'text-destructive' : accent ? 'text-gold' : 'text-foreground'
+        )}
+      >
+        {value}
+      </div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+    </div>
   )
 }

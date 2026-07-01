@@ -193,6 +193,17 @@ export type FriendshipRow = {
   created_at: string
 }
 
+export type PlayerStatsRow = {
+  user_id: string
+  hands: number
+  wins: number
+  losses: number
+  pushes: number
+  blackjacks: number
+  net: number
+  updated_at: string
+}
+
 type Tbl<R> = {
   Row: R
   Insert: Partial<R>
@@ -213,6 +224,7 @@ export type Database = {
       settlements: Tbl<SettlementRow>
       profiles: Tbl<ProfileRow>
       friendships: Tbl<FriendshipRow>
+      player_stats: Tbl<PlayerStatsRow>
     }
     Views: Record<string, never>
     Functions: {
@@ -242,6 +254,18 @@ export type Database = {
         } | null
       }
       set_dealer_hole_card: { Args: { p_round_id: string; p_card: unknown }; Returns: undefined }
+      bump_player_stats: {
+        Args: {
+          p_user_id: string
+          p_hands: number
+          p_wins: number
+          p_losses: number
+          p_pushes: number
+          p_blackjacks: number
+          p_net: number
+        }
+        Returns: undefined
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
